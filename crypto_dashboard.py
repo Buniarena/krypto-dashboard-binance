@@ -3,18 +3,24 @@ import requests
 import pandas as pd
 from ta.momentum import RSIIndicator
 
-st.title("Çmimi dhe Analiza RSI për Shiba Inu (SHIB)")
+st.title("Çmimet dhe Analiza RSI për BTC, ETH dhe XRP")
 
-def fetch_current_price():
+coins = {
+    "Bitcoin": "bitcoin",
+    "Ethereum": "ethereum",
+    "XRP": "ripple"
+}
+
+def fetch_current_price(coin_id):
     url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {"ids": "shiba-inu", "vs_currencies": "usd"}
+    params = {"ids": coin_id, "vs_currencies": "usd"}
     r = requests.get(url, params=params)
     r.raise_for_status()
     data = r.json()
-    return data["shiba-inu"]["usd"]
+    return data[coin_id]["usd"]
 
-def fetch_price_history():
-    url = "https://api.coingecko.com/api/v3/coins/shiba-inu/market_chart"
+def fetch_price_history(coin_id):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {"vs_currency": "usd", "days": "7", "interval": "daily"}
     r = requests.get(url, params=params)
     r.raise_for_status()
@@ -25,23 +31,25 @@ def fetch_price_history():
     df.set_index("timestamp", inplace=True)
     return df
 
-current_price = fetch_current_price()
-st.write(f"💰 Çmimi aktual i SHIB: ${current_price:.8f}")
+for name, coin_id in coins.items():
+    st.subheader(name)
+    try:
+        current_price = fetch_current_price(coin_id)
+        st.write(f"💰 Çmimi aktual: **${current_price:.4f}**")
 
-df = fetch_price_history()
-df["RSI"] = RSIIndicator(df["price"], window=14).rsi()
+        df = fetch_price_history(coin_id)
+        df["RSI"] = RSIIndicator(df["price"], window=14).rsi()
+        last_rsi = df["RSI"].iloc[-1]
 
-last_rsi = df["RSI"].iloc[-1]
+        if last_rsi < 30:
+            st.success(f"📈 Sinjal RSI: BLEJ (RSI = {last_rsi:.2f})")
+        elif last_rsi > 70:
+            st.error(f"📉 Sinjal RSI: SHIT (RSI = {last_rsi:.2f})")
+        else:
+            st.info(f"⏸ Sinjal RSI: NEUTRAL (RSI = {last_rsi:.2f})")
 
-if last_rsi < 30:
-    st.success(f"📈 Sinjal RSI: BLEJ (RSI = {last_rsi:.2f})")
-elif last_rsi > 70:
-    st.error(f"📉 Sinjal RSI: SHIT (RSI = {last_rsi:.2f})")
-else:
-    st.info(f"⏸ Sinjal RSI: NEUTRAL (RSI = {last_rsi:.2f})")
+        st.line_chart(df["price"])
+        st.line_chart(df["RSI"])
 
-st.subheader("Grafiku i Çmimit të SHIB (7 ditë)")
-st.line_chart(df["price"])
-
-st.subheader("Grafiku RSI")
-st.line_chart(df["RSI"])
+    except Exception as e:
+        st.error(f"Nuk u morën të dhëna për {name}: {e}")
