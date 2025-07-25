@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-st.title("📈 Çmimet Live të Kriptomonedhave")
+st.title("📈 Çmimet Live të Kriptove")
 
 coins = {
     "Bitcoin": "bitcoin",
@@ -11,15 +11,16 @@ coins = {
 }
 
 for name, coin_id in coins.items():
-    url = f"https://api.coingecko.com/api/v3/simple/price"
-    params = {"ids": coin_id, "vs_currencies": "usd"}
     try:
-        response = requests.get(url, params=params)
+        url = f"https://api.coingecko.com/api/v3/simple/price"
+        params = {"ids": coin_id, "vs_currencies": "usd"}
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
         data = response.json()
-        if coin_id in data:
-            price = data[coin_id]["usd"]
-            st.metric(label=f"{name}", value=f"${price}")
+        price = data.get(coin_id, {}).get("usd", None)
+        if price is not None:
+            st.metric(label=name, value=f"${price:,}")
         else:
             st.warning(f"Nuk u morën të dhëna për {name}.")
     except Exception as e:
-        st.warning(f"Gabim te {name}: {e}")
+        st.error(f"Gabim gjatë marrjes së të dhënave për {name}: {e}")
