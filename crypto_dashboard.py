@@ -1,13 +1,13 @@
 import streamlit as st
 import requests
 
-st.title("Çmimet Live të Kriptove")
+st.title("Çmimet Live nga CoinGecko")
 
 coins = {
     "Bitcoin": "bitcoin",
+    "Ethereum": "ethereum",
     "Dogecoin": "dogecoin",
-    "XRP": "ripple",
-    "Pepe": "pepe"
+    "XRP": "ripple"
 }
 
 for name, coin_id in coins.items():
@@ -19,8 +19,8 @@ for name, coin_id in coins.items():
         data = response.json()
         price = data.get(coin_id, {}).get("usd")
         if price is not None:
-            st.metric(label=name, value=f"${price:,}")
+            st.write(f"{name}: ${price}")
         else:
-            st.warning(f"Nuk u morën të dhëna për {name}.")
+            st.write(f"Nuk u morën të dhëna për {name}.")
     except Exception as e:
-        st.error(f"Gabim për {name}: {e}")
+        st.write(f"Gabim për {name}: {e}")
