@@ -1,89 +1,74 @@
 import streamlit as st
-import pandas as pd
 import requests
+import pandas as pd
 from ta.momentum import RSIIndicator
 from ta.trend import MACD
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Krypto Dashboard me Analizë", layout="wide")
-st.title("📊 Dashboard Krypto me Analizë Teknike (RSI & MACD)")
+st.title("📊 PEPE Crypto Price & Analiza Teknike")
 
-coins = {
-    "Bitcoin (BTC)": "bitcoin",
-    "Dogecoin (DOGE)": "dogecoin",
-    "XRP (Ripple)": "ripple"
-}
-
-def fetch_data(coin_id):
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-    params = {"vs_currency": "usd", "days": "1", "interval": "hourly"}
-    headers = {"User-Agent": "Mozilla/5.0"}
+# Merr të dhëna historike 1 ditore me interval 5 minuta nga CoinGecko për PEPE
+def fetch_pepe_data():
+    url = "https://api.coingecko.com/api/v3/coins/pepe/market_chart"
+    params = {"vs_currency": "usd", "days": "1", "interval": "minute"}
     try:
-        response = requests.get(url, params=params, headers=headers, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        prices = data["prices"]
+        r = requests.get(url, params=params)
+        r.raise_for_status()
+        data = r.json()
+        prices = data["prices"]  # listë [ [timestamp, price], ... ]
         df = pd.DataFrame(prices, columns=["timestamp", "price"])
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
         df.set_index("timestamp", inplace=True)
         return df
     except Exception as e:
-        st.error(f"❌ Gabim gjatë marrjes së të dhënave për {coin_id}: {e}")
+        st.error(f"Gabim në marrjen e të dhënave: {e}")
         return None
 
-def analyze(df):
+df = fetch_pepe_data()
+
+if df is not None and not df.empty:
+    # Llogarit RSI dhe MACD
     df["RSI"] = RSIIndicator(df["price"], window=14).rsi()
-    macd_indicator = MACD(df["price"])
-    df["MACD"] = macd_indicator.macd()
-    df["MACD_signal"] = macd_indicator.macd_signal()
-    df["MACD_diff"] = macd_indicator.macd_diff()
-    # Sinjale bazuar tek RSI
-    last_rsi = df["RSI"].iloc[-1]
-    if last_rsi < 30:
-        rsi_signal = "📥 BLEJ (RSI < 30)"
-    elif last_rsi > 70:
-        rsi_signal = "📤 SHIT (RSI > 70)"
+    macd = MACD(df["price"])
+    df["MACD"] = macd.macd()
+    df["MACD_signal"] = macd.macd_signal()
+    df["MACD_diff"] = macd.macd_diff()
+
+    st.write(f"Çmimi aktual i PEPE: **${df['price'].iloc[-1]:.6f}**")
+
+    # Sinjali RSI
+    rsi_now = df["RSI"].iloc[-1]
+    if rsi_now < 30:
+        st.success(f"Sinjal RSI: BLEJ (RSI = {rsi_now:.2f} < 30)")
+    elif rsi_now > 70:
+        st.warning(f"Sinjal RSI: SHIT (RSI = {rsi_now:.2f} > 70)")
     else:
-        rsi_signal = "⏸ MBANJE (RSI normal)"
-    # Sinjal bazuar tek MACD (kryqëzimi i MACD me MACD_signal)
-    last_macd = df["MACD"].iloc[-1]
-    last_signal = df["MACD_signal"].iloc[-1]
-    if last_macd > last_signal:
-        macd_signal = "📈 Trend pozitiv (MACD mbi sinjal)"
+        st.info(f"Sinjal RSI: NEUTRAL (RSI = {rsi_now:.2f})")
+
+    # Sinjali MACD
+    if df["MACD"].iloc[-1] > df["MACD_signal"].iloc[-1]:
+        st.success("Sinjal MACD: Trend pozitiv (MACD > Signal)")
     else:
-        macd_signal = "📉 Trend negativ (MACD poshtë sinjalit)"
-    return df, rsi_signal, macd_signal
+        st.warning("Sinjal MACD: Trend negativ (MACD < Signal)")
 
-for name, coin_id in coins.items():
-    st.subheader(name)
-    df = fetch_data(coin_id)
-    if df is not None and not df.empty:
-        df, rsi_signal, macd_signal = analyze(df)
+    # Grafikët
+    st.subheader("Grafiku i Çmimit të PEPE")
+    st.line_chart(df["price"])
 
-        st.write(f"💰 Çmimi i fundit: **${df['price'].iloc[-1]:,.4f}**")
-        st.write(f"📊 Sinjali RSI: **{rsi_signal}**")
-        st.write(f"📈 Sinjali MACD: **{macd_signal}**")
+    st.subheader("Grafiku RSI")
+    fig, ax = plt.subplots()
+    df["RSI"].plot(ax=ax)
+    ax.axhline(30, color="green", linestyle="--")
+    ax.axhline(70, color="red", linestyle="--")
+    st.pyplot(fig)
 
-        # Grafikët
-        with st.expander("📉 Grafik çmimi"):
-            st.line_chart(df["price"])
+    st.subheader("Grafiku MACD")
+    fig2, ax2 = plt.subplots()
+    df["MACD"].plot(ax=ax2, label="MACD")
+    df["MACD_signal"].plot(ax=ax2, label="Signal")
+    ax2.fill_between(df.index, df["MACD_diff"], 0, alpha=0.3, color="grey")
+    ax2.legend()
+    st.pyplot(fig2)
 
-        with st.expander("📈 Grafik RSI"):
-            fig, ax = plt.subplots()
-            df["RSI"].plot(ax=ax, color="blue")
-            ax.axhline(30, color="green", linestyle="--")
-            ax.axhline(70, color="red", linestyle="--")
-            ax.set_title("RSI")
-            st.pyplot(fig)
-
-        with st.expander("📊 Grafik MACD"):
-            fig, ax = plt.subplots()
-            df["MACD"].plot(ax=ax, label="MACD", color="purple")
-            df["MACD_signal"].plot(ax=ax, label="Signal", color="orange")
-            ax.fill_between(df.index, df["MACD_diff"], 0, alpha=0.3, color="grey")
-            ax.legend()
-            ax.set_title("MACD")
-            st.pyplot(fig)
-
-    else:
-        st.warning(f"Nuk u morën të dhëna për {name}.")
+else:
+    st.error("Nuk u morën të dhëna për PEPE.")
