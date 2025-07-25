@@ -1,26 +1,37 @@
 import streamlit as st
 import requests
+import time
 
-st.title("📈 Çmimet Live të Kriptove")
+st.title("📊 Çmimet Live me Binance API")
 
 coins = {
-    "Bitcoin": "bitcoin",
-    "Ethereum": "ethereum",
-    "Dogecoin": "dogecoin",
-    "XRP": "ripple"
+    "Bitcoin": "BTCUSDT",
+    "Dogecoin": "DOGEUSDT",
+    "XRP": "XRPUSDT"
 }
 
-for name, coin_id in coins.items():
+def get_price(symbol):
+    url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
     try:
-        url = f"https://api.coingecko.com/api/v3/simple/price"
-        params = {"ids": coin_id, "vs_currencies": "usd"}
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, timeout=5)
         response.raise_for_status()
         data = response.json()
-        price = data.get(coin_id, {}).get("usd", None)
-        if price is not None:
-            st.metric(label=name, value=f"${price:,}")
-        else:
-            st.warning(f"Nuk u morën të dhëna për {name}.")
+        return float(data['price'])
     except Exception as e:
-        st.error(f"Gabim gjatë marrjes së të dhënave për {name}: {e}")
+        st.error(f"Gabim te {symbol}: {e}")
+        return None
+
+placeholder = st.empty()
+
+while True:
+    prices = {}
+    for name, symbol in coins.items():
+        price = get_price(symbol)
+        if price:
+            prices[name] = price
+
+    with placeholder.container():
+        for name, price in prices.items():
+            st.metric(label=name, value=f"${price:,.4f}")
+
+    time.sleep(5)  # Merr çmimet çdo 5 sekonda
