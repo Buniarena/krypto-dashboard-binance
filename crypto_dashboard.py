@@ -1,46 +1,71 @@
 import streamlit as st
+import pandas as pd
 import requests
+import plotly.graph_objs as go
+import ta
 
-# Lista e kriptove dhe ID-të e tyre në CoinGecko
+st.set_page_config(page_title="Krypto Dashboard", layout="wide")
+st.title("📊 Krypto Dashboard – BTC, DOGE, XRP")
+
 coins = {
-    "Bitcoin (BTC)": "bitcoin",
-    "Ethereum (ETH)": "ethereum",
-    "Dogecoin (DOGE)": "dogecoin",
-    "XRP (XRP)": "ripple",
-    "Pepe (PEPE)": "pepe",
-    "Verge (XVG)": "verge"
+    "Bitcoin": "bitcoin",
+    "Dogecoin": "dogecoin",
+    "XRP": "ripple"
 }
 
-st.set_page_config(page_title="Krypto Live Monitor", layout="wide")
-st.title("🚀 Krypto Monitor Real-Time")
-
-# Funksion për të marrë të dhënat nga CoinGecko
-def get_market_data(coin_id):
-    url = f"https://api.coingecko.com/api/v3/coins/markets"
-    params = {
-        "vs_currency": "usd",
-        "ids": coin_id,
-        "price_change_percentage": "1h,24h"
-    }
-    response = requests.get(url, params=params)
+def fetch_market_data(coin_id):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency=usd&days=1&interval=minute"
+    response = requests.get(url)
     if response.status_code == 200:
-        return response.json()[0]
+        data = response.json()
+        prices = data["prices"]
+        df = pd.DataFrame(prices, columns=["timestamp", "price"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+        df.set_index("timestamp", inplace=True)
+        return df
     else:
         return None
 
-# Loop për secilën kriptomonedhë
-for name, cg_id in coins.items():
-    data = get_market_data(cg_id)
+def calculate_rsi(df):
+    df['rsi'] = ta.momentum.RSIIndicator(df['price'], window=14).rsi()
+    return df
 
-    if data:
+def signal_from_rsi(rsi):
+    if rsi < 30:
+        return "📈 BLI"
+    elif rsi > 70:
+        return "📉 SHIT"
+    else:
+        return "⏳ PRIT"
+
+for name, coin_id in coins.items():
+    st.header(f"{name.upper()}")
+
+    df = fetch_market_data(coin_id)
+    
+    if df is not None and not df.empty:
+        df = calculate_rsi(df)
+        latest_price = df["price"].iloc[-1]
+        price_1m_ago = df["price"].iloc[-2] if len(df) > 2 else latest_price
+        price_1h_ago = df["price"].iloc[-60] if len(df) > 60 else latest_price
+        price_1d_ago = df["price"].iloc[0]
+
         col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric(label=f"💰 {name}", value=f"${data['current_price']:.4f}")
-        with col2:
-            st.metric(label="⏱ 1 Minutë", value="—", delta="—")  # S’ofrohet nga CoinGecko
-        with col3:
-            delta_1h = data.get("price_change_percentage_1h_in_currency")
-            if delta_1h:
-                st.metric(label="🕐 1 Orë", value=f"{delta_1h:.2f}%", delta=f"{delta_1h:.2f}%")
-            else:
-                st.metric(label="🕐 1 Orë", value="—
+        col1.metric("💰 Çmimi aktual", f"${latest_price:,.4f}")
+        col2.metric("⏱ 1 Minutë", f"${price_1m_ago:,.4f}", f"{latest_price - price_1m_ago:+.4f}")
+        col3.metric("🕐 1 Orë", f"${price_1h_ago:,.4f}", f"{latest_price - price_1h_ago:+.4f}")
+        col4.metric("📆 1 Ditë", f"${price_1d_ago:,.4f}", f"{latest_price - price_1d_ago:+.4f}")
+
+        # RSI + sinjal
+        latest_rsi = df["rsi"].iloc[-1]
+        st.write(f"**RSI:** {latest_rsi:.2f} → **{signal_from_rsi(latest_rsi)}**")
+
+        # Grafik
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=df.index, y=df["price"], name="Çmimi"))
+        fig.update_layout(title=f"Ecuria e çmimit – {name}", xaxis_title="Koha", yaxis_title="Çmimi ($)")
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.divider()
+    else:
+        st.error(f"Nuk u morën të dhëna për {name}.")
