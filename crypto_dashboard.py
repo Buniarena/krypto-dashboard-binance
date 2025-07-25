@@ -12,8 +12,11 @@ coins = {
 
 def get_price(symbol):
     url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
     try:
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()
         data = response.json()
         return float(data['price'])
@@ -34,4 +37,4 @@ while True:
         for name, price in prices.items():
             st.metric(label=name, value=f"${price:,.4f}")
 
-    time.sleep(5)  # Merr çmimet çdo 5 sekonda
+    time.sleep(5)  # rifreskon çdo 5 sekonda
