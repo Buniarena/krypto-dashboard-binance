@@ -1,45 +1,47 @@
 import streamlit as st
 import requests
+import pandas as pd
+from ta.momentum import RSIIndicator
 
-st.title("Çmimet Live: Nafta dhe Ari")
+st.title("Çmimi dhe Analiza RSI për Shiba Inu (SHIB)")
 
-# Vendos këtu çelësat e API-ve nga Metals-API dhe commodities-api
-METALS_API_KEY = "YOUR_METALS_API_KEY"
-COMMODITIES_API_KEY = "YOUR_COMMODITIES_API_KEY"
+def fetch_current_price():
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    params = {"ids": "shiba-inu", "vs_currencies": "usd"}
+    r = requests.get(url, params=params)
+    r.raise_for_status()
+    data = r.json()
+    return data["shiba-inu"]["usd"]
 
-def get_gold_price():
-    url = f"https://metals-api.com/api/latest?access_key={METALS_API_KEY}&base=USD&symbols=XAU"
-    try:
-        r = requests.get(url)
-        r.raise_for_status()
-        data = r.json()
-        price = data['rates']['XAU']
-        return price
-    except Exception as e:
-        st.error(f"Gabim në marrjen e çmimit të arit: {e}")
-        return None
+def fetch_price_history():
+    url = "https://api.coingecko.com/api/v3/coins/shiba-inu/market_chart"
+    params = {"vs_currency": "usd", "days": "7", "interval": "daily"}
+    r = requests.get(url, params=params)
+    r.raise_for_status()
+    data = r.json()
+    prices = data["prices"]
+    df = pd.DataFrame(prices, columns=["timestamp", "price"])
+    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+    df.set_index("timestamp", inplace=True)
+    return df
 
-def get_oil_price():
-    url = f"https://commodities-api.com/api/latest?access_key={COMMODITIES_API_KEY}&base=USD&symbols=WTI"
-    try:
-        r = requests.get(url)
-        r.raise_for_status()
-        data = r.json()
-        price = data['data']['rates']['WTI']
-        return price
-    except Exception as e:
-        st.error(f"Gabim në marrjen e çmimit të naftës: {e}")
-        return None
+current_price = fetch_current_price()
+st.write(f"💰 Çmimi aktual i SHIB: ${current_price:.8f}")
 
-gold_price = get_gold_price()
-oil_price = get_oil_price()
+df = fetch_price_history()
+df["RSI"] = RSIIndicator(df["price"], window=14).rsi()
 
-if gold_price:
-    st.write(f"💰 Çmimi aktual i arit (XAU/USD): ${gold_price:.2f} per ounce")
+last_rsi = df["RSI"].iloc[-1]
+
+if last_rsi < 30:
+    st.success(f"📈 Sinjal RSI: BLEJ (RSI = {last_rsi:.2f})")
+elif last_rsi > 70:
+    st.error(f"📉 Sinjal RSI: SHIT (RSI = {last_rsi:.2f})")
 else:
-    st.write("Nuk u morën të dhëna për arin.")
+    st.info(f"⏸ Sinjal RSI: NEUTRAL (RSI = {last_rsi:.2f})")
 
-if oil_price:
-    st.write(f"⛽ Çmimi aktual i naftës WTI (USD): ${oil_price:.2f} per barrel")
-else:
-    st.write("Nuk u morën të dhëna për naftën.")
+st.subheader("Grafiku i Çmimit të SHIB (7 ditë)")
+st.line_chart(df["price"])
+
+st.subheader("Grafiku RSI")
+st.line_chart(df["RSI"])
