@@ -1,25 +1,33 @@
 import streamlit as st
-import requests
 import pandas as pd
-import ta
-import plotly.graph_objs as go
+import requests
+import plotly.graph_objects as go
+from ta.momentum import RSIIndicator
+from ta.trend import MACD
 
-# Titulli i aplikacionit
-st.set_page_config(page_title="Krypto Dashboard", layout="wide")
-st.title("📈 Krypto Dashboard me Binance")
+# Titulli
+st.set_page_config(layout="wide")
+st.title("📊 Krypto Dashboard - Binance Live Signals")
 
-# Funksioni për të marrë të dhëna nga Binance
+# Lista e simboleve që do të analizohen
+symbols = {
+    "Bitcoin (BTC)": "BTCUSDT",
+    "Pepe (PEPE)": "PEPEUSDT",
+    "Verge (XVG)": "XVGUSDT"
+}
+
+# Funksion për të marrë të dhëna historike nga Binance
 def get_binance_data(symbol):
     url = "https://api.binance.com/api/v3/klines"
     params = {
         "symbol": symbol,
-        "interval": "15m",
+        "interval": "1h",  # më i qëndrueshëm se 15m
         "limit": 200
     }
-    response = requests.get(url, params=params)
     try:
+        response = requests.get(url, params=params, timeout=10)
         data = response.json()
-        if not data or not isinstance(data, list):
+        if not data or not isinstance(data, list) or 'code' in data:
             return pd.DataFrame()
         df = pd.DataFrame(data, columns=[
             'time', 'open', 'high', 'low', 'close', 'volume',
@@ -34,28 +42,51 @@ def get_binance_data(symbol):
         st.error(f"Gabim gjatë marrjes së të dhënave për {symbol}: {e}")
         return pd.DataFrame()
 
-# Funksioni për të shtuar indikatorët teknikë
-def add_indicators(df):
-    df['RSI'] = ta.momentum.RSIIndicator(df['close'], window=14).rsi()
-    macd = ta.trend.MACD(df['close'])
+# Funksion për të llogaritur indikatorët teknikë dhe sinjalet
+def calculate_signals(df):
+    if df.empty or len(df) < 50:
+        return None
+
+    close = df['close']
+
+    # RSI
+    rsi = RSIIndicator(close=close, window=14).rsi()
+    df['RSI'] = rsi
+
+    # MACD
+    macd = MACD(close=close)
     df['MACD'] = macd.macd()
-    df['MACD_signal'] = macd.macd_signal()
-    return df
+    df['Signal'] = macd.macd_signal()
 
-# Funksioni për të gjeneruar sinjal
-def get_signal(latest):
-    rsi = latest['RSI']
-    macd = latest['MACD']
-    signal = latest['MACD_signal']
-    if rsi < 30 and macd > signal:
-        return "🟢 **Sinjal Blerjeje**"
-    elif rsi > 70 and macd < signal:
-        return "🔴 **Sinjal Shitjeje**"
-    else:
-        return "🟡 **Mbaj / Pa sinjal të qartë**"
+    # Gjenerimi i sinjalit
+    latest = df.iloc[-1]
+    signal = "❓ Neutral"
 
-# Funksioni për të vizualizuar grafikun
-def plot_chart(df, name):
+    if latest['RSI'] < 30 and latest['MACD'] > latest['Signal']:
+        signal = "🟢 Buy"
+    elif latest['RSI'] > 70 and latest['MACD'] < latest['Signal']:
+        signal = "🔴 Sell"
+
+    return signal, df
+
+# Loop nëpër simbolet
+for name, symbol in symbols.items():
+    st.subheader(name)
+
+    df = get_binance_data(symbol)
+    if df.empty:
+        st.warning(f"Nuk u morën të dhëna për {name}.")
+        continue
+
+    result = calculate_signals(df)
+    if not result:
+        st.warning(f"Të dhënat për {name} janë të pamjaftueshme.")
+        continue
+
+    signal, df = result
+    st.write(f"**Sinjali aktual:** {signal}")
+
+    # Grafik interaktiv
     fig = go.Figure()
     fig.add_trace(go.Candlestick(
         x=df.index,
@@ -63,37 +94,7 @@ def plot_chart(df, name):
         high=df['high'],
         low=df['low'],
         close=df['close'],
-        name='Candlesticks'
+        name="Çmimi"
     ))
-    fig.update_layout(title=f"{name} - Grafiku i Çmimit", xaxis_title="Koha", yaxis_title="Çmimi (USDT)", height=400)
+    fig.update_layout(height=400, xaxis_rangeslider_visible=False)
     st.plotly_chart(fig, use_container_width=True)
-
-# Lista e monedhave
-symbols = {
-    "Bitcoin (BTC)": "BTCUSDT",
-    "Pepe (PEPE)": "PEPEUSDT",
-    "Verge (XVG)": "XVGUSDT"
-}
-
-# Rreshtimi në tre kolona
-cols = st.columns(len(symbols))
-
-# Loop për çdo monedhë
-for i, (name, symbol) in enumerate(symbols.items()):
-    with cols[i]:
-        df = get_binance_data(symbol)
-
-        if df.empty:
-            st.error(f"Nuk u morën të dhëna për {name}.")
-            continue
-
-        df = add_indicators(df)
-        latest = df.iloc[-1]
-        signal = get_signal(latest)
-
-        st.subheader(f"{name}")
-        st.metric("Aktualisht", f"{latest['close']:.6f} USDT")
-        st.write(f"**RSI:** {latest['RSI']:.2f}")
-        st.write(f"**MACD:** {latest['MACD']:.4f} | Signal: {latest['MACD_signal']:.4f}")
-        st.markdown(f"### {signal}")
-        plot_chart(df, name)
