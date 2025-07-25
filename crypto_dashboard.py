@@ -1,62 +1,45 @@
 import streamlit as st
 import requests
-import pandas as pd
-from ta.momentum import RSIIndicator
 
-st.title("Çmimet dhe Analizat RSI për BTC, XRP dhe DOGE")
+st.title("Çmimet Live: Nafta dhe Ari")
 
-coins = {
-    "Bitcoin": "bitcoin",
-    "XRP": "ripple",
-    "Dogecoin": "dogecoin"
-}
+# Vendos këtu çelësat e API-ve nga Metals-API dhe commodities-api
+METALS_API_KEY = "YOUR_METALS_API_KEY"
+COMMODITIES_API_KEY = "YOUR_COMMODITIES_API_KEY"
 
-def fetch_current_price(coin_id):
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {"ids": coin_id, "vs_currencies": "usd"}
+def get_gold_price():
+    url = f"https://metals-api.com/api/latest?access_key={METALS_API_KEY}&base=USD&symbols=XAU"
     try:
-        r = requests.get(url, params=params, timeout=10)
+        r = requests.get(url)
         r.raise_for_status()
         data = r.json()
-        return data[coin_id]["usd"]
+        price = data['rates']['XAU']
+        return price
     except Exception as e:
-        st.error(f"Gabim në marrjen e çmimit për {coin_id}: {e}")
+        st.error(f"Gabim në marrjen e çmimit të arit: {e}")
         return None
 
-def fetch_price_history(coin_id):
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-    params = {"vs_currency": "usd", "days": "7", "interval": "daily"}
+def get_oil_price():
+    url = f"https://commodities-api.com/api/latest?access_key={COMMODITIES_API_KEY}&base=USD&symbols=WTI"
     try:
-        r = requests.get(url, params=params, timeout=10)
+        r = requests.get(url)
         r.raise_for_status()
         data = r.json()
-        prices = data.get("prices", [])
-        df = pd.DataFrame(prices, columns=["timestamp", "price"])
-        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-        df.set_index("timestamp", inplace=True)
-        return df
+        price = data['data']['rates']['WTI']
+        return price
     except Exception as e:
-        st.error(f"Gabim në marrjen e historikut për {coin_id}: {e}")
+        st.error(f"Gabim në marrjen e çmimit të naftës: {e}")
         return None
 
-for name, coin_id in coins.items():
-    st.subheader(name)
-    price = fetch_current_price(coin_id)
-    if price:
-        st.write(f"💰 Çmimi aktual: ${price}")
-        df = fetch_price_history(coin_id)
-        if df is not None:
-            df["RSI"] = RSIIndicator(df["price"], window=14).rsi()
-            last_rsi = df["RSI"].iloc[-1]
-            if last_rsi < 30:
-                st.success(f"📈 Sinjal RSI: BLEJ (RSI = {last_rsi:.2f})")
-            elif last_rsi > 70:
-                st.error(f"📉 Sinjal RSI: SHIT (RSI = {last_rsi:.2f})")
-            else:
-                st.info(f"⏸ Sinjal RSI: NEUTRAL (RSI = {last_rsi:.2f})")
-            st.line_chart(df["price"])
-            st.line_chart(df["RSI"])
-        else:
-            st.warning("Nuk mund të marrëm historikun për analizë.")
-    else:
-        st.warning("Nuk mund të marrëm çmimin aktual.")
+gold_price = get_gold_price()
+oil_price = get_oil_price()
+
+if gold_price:
+    st.write(f"💰 Çmimi aktual i arit (XAU/USD): ${gold_price:.2f} per ounce")
+else:
+    st.write("Nuk u morën të dhëna për arin.")
+
+if oil_price:
+    st.write(f"⛽ Çmimi aktual i naftës WTI (USD): ${oil_price:.2f} per barrel")
+else:
+    st.write("Nuk u morën të dhëna për naftën.")
