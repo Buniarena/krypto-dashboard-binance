@@ -1,70 +1,36 @@
 import streamlit as st
-import pandas as pd
 import requests
-import plotly.graph_objects as go
-from ta.momentum import RSIIndicator
-from ta.trend import MACD
 
-st.set_page_config(page_title="Krypto Dashboard - CoinGecko", layout="wide")
-st.title("📈 Krypto Dashboard me CoinGecko API")
+st.set_page_config(page_title="Krypto Çmimet Live", page_icon="📈", layout="centered")
 
+st.title("📊 Krypto Çmimet Live nga CoinGecko")
+st.write("Ky dashboard tregon çmimet aktuale për Bitcoin, Dogecoin dhe XRP.")
+
+# Lista e monedhave që duam të shfaqim
 coins = {
     "Bitcoin (BTC)": "bitcoin",
-    "Ethereum (ETH)": "ethereum",
-    "Dogecoin (DOGE)": "dogecoin"
+    "Dogecoin (DOGE)": "dogecoin",
+    "XRP (Ripple)": "ripple"
 }
 
-def get_coin_gecko_data(coin_id, days=30):
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-    params = {
-        "vs_currency": "usd",
-        "days": days,
-        "interval": "hourly"
-    }
-    response = requests.get(url, params=params)
+vs_currency = "usd"
+url = f"https://api.coingecko.com/api/v3/simple/price?ids={','.join(coins.values())}&vs_currencies={vs_currency}"
+
+try:
+    response = requests.get(url)
     data = response.json()
-    prices = data.get("prices", [])
-    if not prices:
-        return pd.DataFrame()
-    df = pd.DataFrame(prices, columns=["timestamp", "price"])
-    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-    df.set_index("timestamp", inplace=True)
-    df["close"] = df["price"]
-    df.drop(columns=["price"], inplace=True)
-    return df
 
-def add_indicators(df):
-    df['RSI'] = RSIIndicator(df['close'], window=14).rsi()
-    macd = MACD(df['close'])
-    df['MACD'] = macd.macd()
-    df['MACD_signal'] = macd.macd_signal()
-    return df
+    st.subheader("💰 Çmimet aktuale (USD):")
+    for name, api_id in coins.items():
+        price = data.get(api_id, {}).get(vs_currency)
+        if price is not None:
+            st.metric(label=name, value=f"${price:,.4f}")
+        else:
+            st.warning(f"Nuk u morën të dhëna për {name}")
 
-def get_signal(row):
-    if row['RSI'] < 30 and row['MACD'] > row['MACD_signal']:
-        return "🟢 BUY"
-    elif row['RSI'] > 70 and row['MACD'] < row['MACD_signal']:
-        return "🔴 SELL"
-    else:
-        return "🟡 HOLD"
+except Exception as e:
+    st.error("❌ Gabim gjatë marrjes së të dhënave. Kontrollo lidhjen me internetin ose CoinGecko API.")
+    st.code(str(e), language="python")
 
-cols = st.columns(len(coins))
-
-for i, (name, coin_id) in enumerate(coins.items()):
-    with cols[i]:
-        df = get_coin_gecko_data(coin_id)
-        if df.empty:
-            st.error(f"Nuk u morën të dhëna për {name}")
-            continue
-        df = add_indicators(df)
-        latest = df.iloc[-1]
-        signal = get_signal(latest)
-        st.subheader(name)
-        st.metric("Çmimi aktual", f"${latest['close']:.6f}")
-        st.write(f"RSI: {latest['RSI']:.2f}")
-        st.write(f"MACD: {latest['MACD']:.4f}, Signal: {latest['MACD_signal']:.4f}")
-        st.markdown(f"### {signal}")
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df.index, y=df['close'], mode='lines', name='Çmimi'))
-        fig.update_layout(height=400, xaxis_title="Koha", yaxis_title="Çmimi (USD)")
-        st.plotly_chart(fig, use_container_width=True)
+st.markdown("---")
+st.caption("Powered by CoinGecko API • Streamlit App nga Buniarena")
