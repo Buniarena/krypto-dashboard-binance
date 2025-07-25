@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import requests
-import datetime
 import plotly.graph_objects as go
 from ta.momentum import RSIIndicator
 from ta.trend import MACD
@@ -9,11 +8,10 @@ from ta.trend import MACD
 st.set_page_config(page_title="Krypto Dashboard - CoinGecko", layout="wide")
 st.title("📈 Krypto Dashboard me CoinGecko API")
 
-# CoinGecko IDs për monedhat
 coins = {
     "Bitcoin (BTC)": "bitcoin",
-    "Pepe (PEPE)": "pepecoin",
-    "Verge (XVG)": "verge"
+    "Ethereum (ETH)": "ethereum",
+    "Dogecoin (DOGE)": "dogecoin"
 }
 
 def get_coin_gecko_data(coin_id, days=30):
