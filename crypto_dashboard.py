@@ -1,9 +1,14 @@
 import streamlit as st
 import requests
 import pandas as pd
+import time
 from ta.momentum import RSIIndicator
+from ta.trend import SMAIndicator
 
-st.title("Çmimet dhe Analiza RSI për BTC, ETH dhe XRP")
+st.set_page_config(page_title="Kripto Dashboard", layout="wide")
+
+st.title("📊 Dashboard: BTC, ETH, XRP - RSI & MA")
+st.caption("Live nga CoinGecko | Auto-refresh çdo 15 sek | Cache 5 min")
 
 coins = {
     "Bitcoin": "bitcoin",
@@ -11,45 +16,50 @@ coins = {
     "XRP": "ripple"
 }
 
-def fetch_current_price(coin_id):
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {"ids": coin_id, "vs_currencies": "usd"}
-    r = requests.get(url, params=params)
-    r.raise_for_status()
-    data = r.json()
-    return data[coin_id]["usd"]
-
-def fetch_price_history(coin_id):
+@st.cache_data(ttl=300)  # ruan të dhënat për 5 minuta
+def fetch_data(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-    params = {"vs_currency": "usd", "days": "7", "interval": "daily"}
+    params = {"vs_currency": "usd", "days": "1", "interval": "minute"}
     r = requests.get(url, params=params)
     r.raise_for_status()
-    data = r.json()
-    prices = data["prices"]
+    prices = r.json()["prices"]
     df = pd.DataFrame(prices, columns=["timestamp", "price"])
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
     df.set_index("timestamp", inplace=True)
     return df
 
-for name, coin_id in coins.items():
-    st.subheader(name)
-    try:
-        current_price = fetch_current_price(coin_id)
-        st.write(f"💰 Çmimi aktual: **${current_price:.4f}**")
+def analyze(df):
+    df["SMA_20"] = SMAIndicator(df["price"], window=20).sma_indicator()
+    df["RSI"] = RSIIndicator(df["price"], window=14).rsi()
+    return df
 
-        df = fetch_price_history(coin_id)
-        df["RSI"] = RSIIndicator(df["price"], window=14).rsi()
-        last_rsi = df["RSI"].iloc[-1]
+placeholder = st.empty()
 
-        if last_rsi < 30:
-            st.success(f"📈 Sinjal RSI: BLEJ (RSI = {last_rsi:.2f})")
-        elif last_rsi > 70:
-            st.error(f"📉 Sinjal RSI: SHIT (RSI = {last_rsi:.2f})")
-        else:
-            st.info(f"⏸ Sinjal RSI: NEUTRAL (RSI = {last_rsi:.2f})")
+while True:
+    with placeholder.container():
+        cols = st.columns(len(coins))
+        for i, (name, coin_id) in enumerate(coins.items()):
+            try:
+                df = fetch_data(coin_id)
+                df = analyze(df)
+                price_now = df["price"].iloc[-1]
+                rsi_now = df["RSI"].iloc[-1]
+                ma_now = df["SMA_20"].iloc[-1]
 
-        st.line_chart(df["price"])
-        st.line_chart(df["RSI"])
+                with cols[i]:
+                    st.subheader(f"{name}")
+                    st.metric("💰 Çmimi", f"${price_now:,.2f}")
+                    st.write(f"📉 RSI: **{rsi_now:.2f}**")
+                    st.write(f"📈 MA 20: **{ma_now:.2f}**")
+                    if rsi_now < 30:
+                        st.success("Sinjal: BLEJ 📥")
+                    elif rsi_now > 70:
+                        st.error("Sinjal: SHIT 📤")
+                    else:
+                        st.info("Sinjal: NEUTRAL ⏸")
+                    st.line_chart(df[["price", "SMA_20"]])
 
-    except Exception as e:
-        st.error(f"Nuk u morën të dhëna për {name}: {e}")
+            except Exception as e:
+                st.error(f"Gabim për {name}: {e}")
+
+    time.sleep(15)  # auto-refresh çdo 15 sek
