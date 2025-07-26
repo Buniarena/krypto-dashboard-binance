@@ -1,4 +1,8 @@
-import streamlit as st import requests import pandas as pd import ta import time
+import streamlit as st 
+import requests 
+import pandas as pd 
+import ta 
+import time
 
 CoinGecko API endpoint
 
