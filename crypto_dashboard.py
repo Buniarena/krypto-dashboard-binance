@@ -19,7 +19,7 @@ def refresh_if_needed():
         st.session_state.start_time = time.time()
         st.experimental_rerun()
 
-st.title("⏳ Countdown për rifreskim të të dhënave")
+st.title("📊 Dashboard: Çmimi Aktual dhe RSI për Coinet")
 
 countdown_placeholder = st.empty()
 
@@ -71,13 +71,22 @@ def get_signal(rsi):
     else:
         return "❓ N/A"
 
+def signal_color(signal):
+    if signal == "🟢 Bli":
+        return "green"
+    elif signal == "🔴 Shit":
+        return "red"
+    elif signal == "🟡 Mbaj":
+        return "orange"
+    else:
+        return "gray"
+
 try:
     current_prices = get_prices(list(coins.values()))
 except requests.exceptions.RequestException as e:
     st.error(f"Gabim API: {e}")
     current_prices = {}
 
-rows = []
 for name, coin_id in coins.items():
     price = current_prices.get(coin_id, {}).get("usd")
     try:
@@ -85,27 +94,27 @@ for name, coin_id in coins.items():
         rsi = RSIIndicator(close=hist_df["price"]).rsi().iloc[-1]
         rsi_value = round(rsi, 2)
     except Exception:
-        rsi_value = "Nuk u llogarit"
+        rsi_value = None
     
-    signal = get_signal(rsi_value if isinstance(rsi_value, float) else None)
+    signal = get_signal(rsi_value)
 
-    if price is not None:
-        rows.append({
-            "Coin": name,
-            "Çmimi aktual (USD)": f"${price}",
-            "RSI (14 ditë)": rsi_value,
-            "Sinjali": signal
-        })
-    else:
-        rows.append({
-            "Coin": name,
-            "Çmimi aktual (USD)": "Nuk u morën të dhënat",
-            "RSI (14 ditë)": rsi_value,
-            "Sinjali": signal
-        })
+    # Kolona për sinjal me ngjyrë dhe font bold
+    signal_html = f'<span style="color:{signal_color(signal)}; font-weight: bold;">{signal}</span>'
 
-df = pd.DataFrame(rows)
-st.table(df)
+    # Shfaqim secilin coin në kolonë të veçantë me metric për çmim dhe RSI
+    with st.container():
+        st.markdown(f"### {name}")
+        if price is not None:
+            col1, col2, col3 = st.columns([1.5, 1.5, 1])
+            col1.metric(label="💰 Çmimi aktual (USD)", value=f"${price:,.6f}")
+            if rsi_value is not None:
+                col2.metric(label="📈 RSI (14 ditë)", value=f"{rsi_value}")
+            else:
+                col2.markdown("📈 RSI: ❓ N/A")
+            col3.markdown(signal_html, unsafe_allow_html=True)
+        else:
+            st.warning("Nuk u morën të dhënat për këtë coin.")
+
 st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL//60} minuta. Burimi: CoinGecko | RSI bazuar në çmimet ditore të 30 ditëve.")
 
 for i in range(seconds_remaining(), -1, -1):
