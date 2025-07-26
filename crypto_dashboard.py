@@ -4,7 +4,7 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 import time
 
-REFRESH_INTERVAL = 180  # 180 sekonda = 3 minuta
+REFRESH_INTERVAL = 10  # 10 sekonda
 
 if "start_time" not in st.session_state:
     st.session_state.start_time = time.time()
@@ -106,7 +106,7 @@ for name, coin_id in coins.items():
 
 df = pd.DataFrame(rows)
 st.table(df)
-st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL//60} minuta. Burimi: CoinGecko | RSI bazuar në çmimet ditore të 30 ditëve.")
+st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL} sekonda. Burimi: CoinGecko | RSI bazuar në çmimet ditore të 30 ditëve.")
 
 for i in range(seconds_remaining(), -1, -1):
     countdown_placeholder.markdown(f"⏳ Rifreskimi i ardhshëm në: **{i} sekonda**")
