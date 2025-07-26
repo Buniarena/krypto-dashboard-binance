@@ -2,6 +2,25 @@ import streamlit as st
 import requests
 import pandas as pd
 from ta.momentum import RSIIndicator
+import time
+
+# Intervali i rifreskimit në sekonda
+REFRESH_INTERVAL = 600  # 10 minuta
+
+# Koha kur u startua app (në sekonda)
+if "start_time" not in st.session_state:
+    st.session_state.start_time = time.time()
+
+# Koha aktuale dhe koha e kaluar
+elapsed_time = time.time() - st.session_state.start_time
+remaining_time = REFRESH_INTERVAL - elapsed_time
+
+# Nëse kaluan 10 minuta, rifresko dhe ri-inicializo kohën
+if remaining_time <= 0:
+    st.experimental_rerun()
+
+# Shfaq countdown timer
+st.write(f"⏳ Rifreskimi i ardhshëm në: {int(remaining_time)} sekonda")
 
 coins = {
     "Bitcoin": "bitcoin",
@@ -30,7 +49,7 @@ def get_historical_prices(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {
         "vs_currency": "usd",
-        "days": "30",  # 30 ditë historik
+        "days": "30",
         "interval": "daily"
     }
     response = requests.get(url, params=params, timeout=10)
