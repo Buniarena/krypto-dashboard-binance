@@ -4,7 +4,7 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 import time
 
-REFRESH_INTERVAL = 180  # 3 minuta (mund ta ndryshosh sipas dëshirës)
+REFRESH_INTERVAL = 600  # 10 minuta
 
 if "start_time" not in st.session_state:
     st.session_state.start_time = time.time()
@@ -45,7 +45,7 @@ def get_prices(coin_ids):
     response.raise_for_status()
     return response.json()
 
-# Merr çmimet historike me interval 1 ore për 1 ditë (24 orë)
+# Merr historikun vetëm për 1 coin (Bitcoin) për shembull, për të mos abuzuar me API
 @st.cache_data(ttl=REFRESH_INTERVAL)
 def get_hourly_prices_1day(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
@@ -81,13 +81,18 @@ except requests.exceptions.RequestException as e:
 rows = []
 for name, coin_id in coins.items():
     price = current_prices.get(coin_id, {}).get("usd")
-    try:
-        hist_df = get_hourly_prices_1day(coin_id)
-        rsi = RSIIndicator(close=hist_df["price"]).rsi().iloc[-1]
-        rsi_value = round(rsi, 2)
-    except Exception:
-        rsi_value = "Nuk u llogarit"
-    
+
+    # Për të shmangur shumë kërkesa, llogaritim RSI vetëm për Bitcoin, për të tjerët vendosim "N/A"
+    if coin_id == "bitcoin" and price is not None:
+        try:
+            hist_df = get_hourly_prices_1day(coin_id)
+            rsi = RSIIndicator(close=hist_df["price"]).rsi().iloc[-1]
+            rsi_value = round(rsi, 2)
+        except Exception:
+            rsi_value = "Nuk u llogarit"
+    else:
+        rsi_value = "N/A"
+
     signal = get_signal(rsi_value if isinstance(rsi_value, float) else None)
 
     if price is not None:
@@ -107,8 +112,8 @@ for name, coin_id in coins.items():
 
 df = pd.DataFrame(rows)
 st.table(df)
-st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL} sekonda. Burimi: CoinGecko | RSI bazuar në çmimet orare të 1 ditës.")
-        
+st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL//60} minuta. Burimi: CoinGecko | RSI i llogaritur vetëm për Bitcoin për të shmangur gabime.")
+
 for i in range(seconds_remaining(), -1, -1):
     countdown_placeholder.markdown(f"⏳ Rifreskimi i ardhshëm në: **{i} sekonda**")
     time.sleep(1)
