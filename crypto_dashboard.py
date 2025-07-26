@@ -8,7 +8,8 @@ coins = {
     "PEPE": "pepe",
     "Doge": "dogecoin",
     "Shiba": "shiba-inu",
-    "Bonk": "bonk"
+    "Bonk": "bonk",
+    "XVG (Verge)": "verge"
 }
 
 st.title("📊 Çmimi Aktual, RSI dhe Sinjali për Coinet")
