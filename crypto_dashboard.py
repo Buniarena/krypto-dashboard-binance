@@ -1,27 +1,24 @@
-import streamlit as st import requests import pandas as pd
+import streamlit as st import requests import pandas as pd import ta import time
 
-Konfigurimi i faqes
+CoinGecko API endpoint
 
-st.set_page_config(page_title="Crypto Dashboard", layout="wide") st.title("📊 Crypto Dashboard - BTC, ETH, XRP dhe më shumë")
+API_URL = "https://api.coingecko.com/api/v3/simple/price"
 
-Lista e monedhave
+Coin list with CoinGecko IDs and symbols
 
-coins = { "BTC": "bitcoin", "ETH": "ethereum", "XRP": "ripple", "BONK": "bonk", "WIN": "wink", "VET": "vechain", "BTT": "bittorrent-2", "XVG": "verge", "FLOKI": "floki" }
+coins = { "BTC": "bitcoin", "XVG": "verge", "FLOKI": "floki", "PEPE": "pepecoin-community", "VET": "vechain", "BONK": "bonk", "DOGE": "dogecoin", "SHIB": "shiba", "WIN": "wink", "BTT": "bittorrent-2" }
 
-Funksion për marrjen e çmimeve nga CoinGecko
+Set page config
 
-@st.cache_data(ttl=300)  # ruaj të dhënat për 5 minuta def fetch_prices(): try: ids = ",".join(coins.values()) url = f"https://api.coingecko.com/api/v3/simple/price" params = { "ids": ids, "vs_currencies": "usd", "include_24hr_change": "true" } res = requests.get(url, params=params) res.raise_for_status() return res.json() except requests.RequestException as e: st.error(f"Gabim gjatë marrjes së të dhënave: {e}") return {}
+st.set_page_config(page_title="Crypto Dashboard", layout="wide") st.title("Live Crypto Dashboard (CoinGecko)")
 
-Shfaqja e të dhënave
+@st.cache_data(ttl=300)  # cache for 5 minutes def fetch_prices(): ids = ','.join(coins.values()) params = { 'ids': ids, 'vs_currencies': 'usd', 'include_24hr_change': 'true' } response = requests.get(API_URL, params=params) return response.json()
 
-data = fetch_prices() if data: rows = [] for symbol, coin_id in coins.items(): if coin_id in data: price = data[coin_id].get("usd", "N/A") change = data[coin_id].get("usd_24h_change", 0) rows.append({ "Monedha": symbol, "Çmimi ($)": price, "Ndryshim 24h (%)": round(change, 2) })
+def display_data(data): rows = [] for symbol, coingecko_id in coins.items(): if coingecko_id in data: price = data[coingecko_id].get("usd", 0) change = data[coingecko_id].get("usd_24h_change", 0) rows.append({"Symbol": symbol, "Price ($)": price, "24h Change (%)": round(change, 2)})
 
 df = pd.DataFrame(rows)
+df = df.sort_values("Symbol")
 st.dataframe(df, use_container_width=True)
 
-Opsion për rifreskim manual
-
-if st.button("🔁 Rifresko të dhënat"): st.cache_data.clear() st.experimental_rerun()
-
-st.caption("Burimi: CoinGecko • Rifreskim automatik çdo 5 minuta ose manual me buton")
+if name == "main": while True: crypto_data = fetch_prices() display_data(crypto_data) time.sleep(15) st.rerun()
 
