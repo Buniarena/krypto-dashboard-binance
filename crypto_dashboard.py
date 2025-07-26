@@ -4,7 +4,7 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 import time
 
-REFRESH_INTERVAL = 180  # sekonda (3 minuta)
+REFRESH_INTERVAL = 180  # sekonda
 
 if "start_time" not in st.session_state:
     st.session_state.start_time = time.time()
@@ -18,7 +18,7 @@ def refresh_if_needed():
         st.session_state.start_time = time.time()
         st.experimental_rerun()
 
-# CSS për stil më të pastër dhe elegant
+# CSS për stil elegant dhe alarm vizual
 page_style = """
 <style>
 body, .stApp {
@@ -41,17 +41,22 @@ body, .stApp {
     font-size: 20px;
     font-weight: bold;
 }
+.blink {
+    animation: blinker 1s linear infinite;
+}
+@keyframes blinker {
+    50% { opacity: 0; }
+}
 </style>
 """
 
 st.markdown(page_style, unsafe_allow_html=True)
-
-st.title("📊 Dashboard: Çmimi, RSI dhe Ndryshimi 24h")
+st.title("📊 Dashboard: RSI, Çmimi dhe Sinjale")
 
 countdown_placeholder = st.empty()
 refresh_if_needed()
 
-# Lista e kriptomonedhave me ID nga CoinGecko
+# Lista e kriptomonedhave
 coins = {
     "Bitcoin": "bitcoin",
     "PEPE": "pepe",
@@ -59,6 +64,8 @@ coins = {
     "Shiba": "shiba-inu",
     "Bonk": "bonk",
     "XVG (Verge)": "verge",
+    "DOGS": "dogs",
+    "AI": "ai-network",
     "WIN": "wink",
     "SLP": "smooth-love-potion",
     "DENT": "dent",
@@ -133,14 +140,16 @@ for name, coin_id in coins.items():
             rsi_value = None
         signal = get_signal(rsi_value)
         color = signal_color(signal)
+        alarm_class = "blink" if signal in ["🟢 Bli", "🔴 Shit"] else ""
 
+        # Paraqitje për çdo kriptomonedhë
         st.markdown(f"""
             <div class='block'>
                 <div class='title'>{name}</div>
-                <p>💰 <b>Çmimi:</b> ${price:,.6f}</p>
+                <p>💰 <b>Çmimi:</b> ${price:,.8f}</p>
                 <p>📊 <b>Ndryshimi 24h:</b> {change_24h:.2f}%</p>
                 <p>📈 <b>RSI:</b> {rsi_value if rsi_value else "N/A"}</p>
-                <p>💡 <b>Sinjal:</b> <span class='signal' style='color:{color}'>{signal}</span></p>
+                <p>💡 <b>Sinjal:</b> <span class='signal {alarm_class}' style='color:{color}'>{signal}</span></p>
             </div>
         """, unsafe_allow_html=True)
     else:
@@ -148,7 +157,7 @@ for name, coin_id in coins.items():
 
 st.caption("🔄 Të dhënat rifreskohen automatikisht çdo 3 minuta. Burimi: CoinGecko")
 
-# Timer rifreskimi
+# Timer për rifreskim
 for i in range(seconds_remaining(), -1, -1):
     countdown_placeholder.markdown(f"⏳ Rifreskimi automatik në: **{i} sekonda**")
     time.sleep(1)
