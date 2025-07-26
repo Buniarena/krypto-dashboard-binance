@@ -4,7 +4,7 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 import time
 
-REFRESH_INTERVAL = 180  # 3 minuta
+REFRESH_INTERVAL = 180
 
 if "start_time" not in st.session_state:
     st.session_state.start_time = time.time()
@@ -18,53 +18,59 @@ def refresh_if_needed():
         st.session_state.start_time = time.time()
         st.experimental_rerun()
 
-# CSS për sfond dhe stil profesional
-page_bg_img = '''
+# CSS me dritare horizontale
+page_style = """
 <style>
 body, .stApp {
-    background-image: url("https://images.unsplash.com/photo-1586105251261-72a756497a12?auto=format&fit=crop&w=1950&q=80");
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    height: 100vh;
+    background: linear-gradient(135deg, #1c1c1c, #2e2e2e);
     color: white;
+    font-family: 'Segoe UI', sans-serif;
 }
 
-.main {
-    background-color: rgba(0, 0, 0, 0.65);
+.card {
+    background-color: #1f2937;
     padding: 20px;
     border-radius: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
 }
 
-.metric-label, .metric-value, h1, h2, h3, p {
-    color: white !important;
+.card h3 {
+    color: #60A5FA;
+    margin: 0;
 }
 
-div.stMarkdown > h1, div.stMarkdown > h2 {
-    color: #00BFFF !important;
+.metric-box {
+    text-align: center;
+}
+
+.metric-value {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.signal {
+    font-size: 20px;
+    font-weight: bold;
 }
 </style>
-'''
+"""
 
-st.markdown(page_bg_img, unsafe_allow_html=True)
+st.markdown(page_style, unsafe_allow_html=True)
 
-# Logo dhe titulli ARENA BUNI
+# Logo dhe titulli
 st.markdown("""
-    <div style='
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        gap: 15px;
-        margin-bottom: 30px;
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        text-shadow: 2px 2px 5px rgba(0,0,0,0.7);
-    '>
-        <div style='font-size:56px;'>🏟️</div>
-        <h1 style='color:#00BFFF; margin:0; font-weight:900; font-size:48px; letter-spacing: 4px;'>ARENA BUNI</h1>
+    <div style='text-align: center; margin-bottom: 30px;'>
+        <h1 style='font-size: 48px; color: #3B82F6; letter-spacing: 4px;'>🏟️ ARENA BUNI</h1>
+        <p style='font-size: 18px; color: #ddd;'>Dashboard profesional për çmimet e kriptovalutave</p>
     </div>
 """, unsafe_allow_html=True)
 
-st.title("📊 Dashboard: Çmimi, RSI dhe Ndryshimi 24h")
+st.title("📊 Çmimi, RSI dhe Ndryshimi 24h")
 countdown_placeholder = st.empty()
 refresh_if_needed()
 
@@ -131,7 +137,7 @@ except Exception as e:
 
 market_data_dict = {coin["id"]: coin for coin in market_data}
 
-# Karta horizontale për çdo coin
+# Karta për çdo coin në mënyrë horizontale
 for name, coin_id in coins.items():
     data = market_data_dict.get(coin_id)
     if data:
@@ -146,23 +152,34 @@ for name, coin_id in coins.items():
         signal = get_signal(rsi_value)
         color = signal_color(signal)
 
-        st.markdown("---")
-        cols = st.columns([1, 1, 1, 1])
-        with cols[0]:
-            st.markdown(f"### {name}")
-        with cols[1]:
-            st.metric("💰 Çmimi (USD)", f"${price:,.6f}")
-        with cols[2]:
-            st.metric("📊 Ndryshimi 24h", f"{change_24h:.2f}%")
-        with cols[3]:
-            st.metric("📈 RSI", f"{rsi_value}" if rsi_value else "N/A")
-            st.markdown(f"<span style='color:{color}; font-weight:bold; font-size:20px'>{signal}</span>", unsafe_allow_html=True)
+        # Layout horizontal
+        st.markdown(f"""
+            <div class='card'>
+                <div><h3>{name}</h3></div>
+                <div class='metric-box'>
+                    <div>💰 Çmimi</div>
+                    <div class='metric-value'>${price:,.6f}</div>
+                </div>
+                <div class='metric-box'>
+                    <div>📊 Ndryshimi 24h</div>
+                    <div class='metric-value'>{change_24h:.2f}%</div>
+                </div>
+                <div class='metric-box'>
+                    <div>📈 RSI</div>
+                    <div class='metric-value'>{rsi_value if rsi_value else "N/A"}</div>
+                </div>
+                <div class='metric-box'>
+                    <div>💡 Sinjal</div>
+                    <div class='signal' style='color: {color}'>{signal}</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
     else:
         st.warning(f"Nuk u morën të dhënat për {name}.")
 
 st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL//60} minuta. Burimi: CoinGecko")
 
-# Timer automatik për rifreskim
+# Timer për rifreskim
 for i in range(seconds_remaining(), -1, -1):
     countdown_placeholder.markdown(f"⏳ Rifreskimi i ardhshëm në: **{i} sekonda**")
     time.sleep(1)
