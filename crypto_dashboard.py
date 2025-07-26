@@ -2,6 +2,28 @@ import streamlit as st
 import requests
 import pandas as pd
 from ta.momentum import RSIIndicator
+import time
+
+REFRESH_INTERVAL = 600  # 10 minuta
+
+if "start_time" not in st.session_state:
+    st.session_state.start_time = time.time()
+
+def seconds_remaining():
+    elapsed = time.time() - st.session_state.start_time
+    remaining = REFRESH_INTERVAL - elapsed
+    return max(0, int(remaining))
+
+def refresh_if_needed():
+    if seconds_remaining() <= 0:
+        st.session_state.start_time = time.time()
+        st.experimental_rerun()
+
+st.title("⏳ Countdown për rifreskim të të dhënave")
+
+countdown_placeholder = st.empty()
+
+refresh_if_needed()
 
 coins = {
     "Bitcoin": "bitcoin",
@@ -12,9 +34,7 @@ coins = {
     "XVG (Verge)": "verge"
 }
 
-st.title("📊 Çmimi Aktual dhe RSI për Coinet")
-
-@st.cache_data(ttl=3600)  # cache për 1 orë
+@st.cache_data(ttl=REFRESH_INTERVAL)
 def get_prices(coin_ids):
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
@@ -25,7 +45,8 @@ def get_prices(coin_ids):
     response.raise_for_status()
     return response.json()
 
-@st.cache_data(ttl=3600)
+# Merr historikun vetëm për 1 coin (Bitcoin) për shembull, për të mos abuzuar me API
+@st.cache_data(ttl=REFRESH_INTERVAL)
 def get_hourly_prices_1day(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {
@@ -51,9 +72,6 @@ def get_signal(rsi):
     else:
         return "❓ N/A"
 
-if st.button("🔄 Rifresko të dhënat"):
-    st.cache_data.clear()  # fshin cache për të detyruar kërkesë të re
-
 try:
     current_prices = get_prices(list(coins.values()))
 except requests.exceptions.RequestException as e:
@@ -64,7 +82,7 @@ rows = []
 for name, coin_id in coins.items():
     price = current_prices.get(coin_id, {}).get("usd")
 
-    # Llogaritim RSI vetëm për Bitcoin për të shmangur kërkesa të shumta
+    # Për të shmangur shumë kërkesa, llogaritim RSI vetëm për Bitcoin, për të tjerët vendosim "N/A"
     if coin_id == "bitcoin" and price is not None:
         try:
             hist_df = get_hourly_prices_1day(coin_id)
@@ -94,4 +112,10 @@ for name, coin_id in coins.items():
 
 df = pd.DataFrame(rows)
 st.table(df)
-st.caption("🔄 Kliko 'Rifresko të dhënat' për të marrë të dhëna të reja nga CoinGecko.")
+st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL//60} minuta. Burimi: CoinGecko | RSI i llogaritur vetëm për Bitcoin për të shmangur gabime.")
+
+for i in range(seconds_remaining(), -1, -1):
+    countdown_placeholder.markdown(f"⏳ Rifreskimi i ardhshëm në: **{i} sekonda**")
+    time.sleep(1)
+    if i == 0:
+        st.experimental_rerun()
