@@ -1,28 +1,60 @@
-import streamlit as st 
-import requests 
-import pandas as pd 
-import ta 
+import streamlit as st
+import requests
+import pandas as pd
+import ta
 import time
 
-CoinGecko API endpoint
-
+# CoinGecko API endpoint
 API_URL = "https://api.coingecko.com/api/v3/simple/price"
 
-Coin list with CoinGecko IDs and symbols
+# Coin list with CoinGecko IDs and symbols
+coins = {
+    "BTC": "bitcoin",
+    "XVG": "verge",
+    "FLOKI": "floki",
+    "PEPE": "pepecoin-community",
+    "VET": "vechain",
+    "BONK": "bonk",
+    "DOGE": "dogecoin",
+    "SHIB": "shiba",
+    "WIN": "wink",
+    "BTT": "bittorrent-2"
+}
 
-coins = { "BTC": "bitcoin", "XVG": "verge", "FLOKI": "floki", "PEPE": "pepecoin-community", "VET": "vechain", "BONK": "bonk", "DOGE": "dogecoin", "SHIB": "shiba", "WIN": "wink", "BTT": "bittorrent-2" }
+# Set page config
+st.set_page_config(page_title="Crypto Dashboard", layout="wide")
+st.title("Live Crypto Dashboard (CoinGecko)")
 
-Set page config
+@st.cache_data(ttl=300)  # cache for 5 minutes
+def fetch_prices():
+    ids = ','.join(coins.values())
+    params = {
+        'ids': ids,
+        'vs_currencies': 'usd',
+        'include_24hr_change': 'true'
+    }
+    response = requests.get(API_URL, params=params)
+    return response.json()
 
-st.set_page_config(page_title="Crypto Dashboard", layout="wide") st.title("Live Crypto Dashboard (CoinGecko)")
+def display_data(data):
+    rows = []
+    for symbol, coingecko_id in coins.items():
+        if coingecko_id in data:
+            price = data[coingecko_id].get("usd", 0)
+            change = data[coingecko_id].get("usd_24h_change", 0)
+            rows.append({"Symbol": symbol, "Price ($)": price, "24h Change (%)": round(change, 2)})
 
-@st.cache_data(ttl=300)  # cache for 5 minutes def fetch_prices(): ids = ','.join(coins.values()) params = { 'ids': ids, 'vs_currencies': 'usd', 'include_24hr_change': 'true' } response = requests.get(API_URL, params=params) return response.json()
+    df = pd.DataFrame(rows)
+    df = df.sort_values("Symbol")
+    st.dataframe(df, use_container_width=True)
 
-def display_data(data): rows = [] for symbol, coingecko_id in coins.items(): if coingecko_id in data: price = data[coingecko_id].get("usd", 0) change = data[coingecko_id].get("usd_24h_change", 0) rows.append({"Symbol": symbol, "Price ($)": price, "24h Change (%)": round(change, 2)})
+if __name__ == "__main__":
+    while True:
+        crypto_data = fetch_prices()
+        display_data(crypto_data)
+        time.sleep(15)
+        st.rerun()
 
-df = pd.DataFrame(rows)
-df = df.sort_values("Symbol")
-st.dataframe(df, use_container_width=True)
 
-if name == "main": while True: crypto_data = fetch_prices() display_data(crypto_data) time.sleep(15) st.rerun()
+Kodi është përditësuar dhe tani përfshin të gjitha coin-at që kërkove: BTC, XVG, FLOKI, PEPE, VET, BONK, DOGE, SHIB, WIN, BTT. Është gjithashtu i rregulluar për të shmangur gabimet e mëparshme të sintaksës. Nëse do një dizajn më të avancuar ose grafikë, më thuaj!
 
