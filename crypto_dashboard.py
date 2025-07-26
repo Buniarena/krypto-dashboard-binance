@@ -2,41 +2,38 @@ import streamlit as st
 import requests
 import pandas as pd
 
+# Emrat e coineve dhe simbolat në Binance (USDT market)
 coins = {
-    "Bitcoin": "bitcoin",
-    "PEPE": "pepe",
-    "Doge": "dogecoin",
-    "Shiba": "shiba-inu",
-    "Bonk": "bonk"
+    "Bitcoin": "BTCUSDT",
+    "PEPE": "PEPEUSDT",
+    "Doge": "DOGEUSDT",
+    "Shiba": "SHIBUSDT",
+    "Bonk": "BONKUSDT"
 }
 
-st.title("📊 Çmimi Aktual për Coinet (Tabela me 1 Kërkesë)")
+st.set_page_config(page_title="📊 Çmimi Aktual për Coinet (Binance API)", layout="centered")
+st.title("📊 Çmimi Aktual për Coinet (Binance API)")
 
-def get_prices(coin_ids):
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {
-        "ids": ",".join(coin_ids),
-        "vs_currencies": "usd"
-    }
+def get_binance_price(symbol):
+    url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
     try:
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, timeout=5)
         response.raise_for_status()
-        return response.json()
+        price = float(response.json().get("price", 0))
+        return price
     except Exception as e:
-        st.error(f"Gabim API: {e}")
-        return {}
+        st.write(f"⚠️ Gabim te {symbol}: {e}")
+        return None
 
-data = get_prices(list(coins.values()))
-
-rows = []
-for name, coin_id in coins.items():
-    price = data.get(coin_id, {}).get("usd", None)
+data = []
+for name, symbol in coins.items():
+    price = get_binance_price(symbol)
     if price is not None:
-        rows.append({"Coin": name, "Çmimi aktual (USD)": f"${price}"})
+        data.append({"Coin": name, "Çmimi aktual (USD)": f"${price:.6f}"})
     else:
-        rows.append({"Coin": name, "Çmimi aktual (USD)": "Nuk u morën të dhënat"})
+        data.append({"Coin": name, "Çmimi aktual (USD)": "Nuk u morën të dhënat"})
 
-df = pd.DataFrame(rows)
+df = pd.DataFrame(data)
 st.table(df)
 
-st.caption("🔄 Të dhënat rifreskohen çdo herë që hap aplikacionin. Burimi: CoinGecko")
+st.caption("🔄 Të dhënat rifreskohen çdo herë që hap aplikacionin. Burimi: Binance API")
