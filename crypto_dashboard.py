@@ -1,71 +1,67 @@
 import streamlit as st
 import requests
 import pandas as pd
-import ta
+import time
 
-st.set_page_config(page_title="BTC RSI", layout="centered")
-st.title("📈 BTC Dashboard me RSI & Moving Averages")
+# Lista e coin-ave me ID nga CoinGecko
+coins = {
+    "BTC": "bitcoin",
+    "XVG": "verge",
+    "FLOKI": "floki",
+    "PEPE": "pepecoin-community",
+    "VET": "vechain",
+    "BONK": "bonk",
+    "DOGE": "dogecoin",
+    "SHIB": "shiba",
+    "WIN": "wink",
+    "BTT": "bittorrent-2"
+}
 
-API_URL = "https://api.coingecko.com/api/v3"
-coin_id = "bitcoin"
+# Konfigurimi i faqes
+st.set_page_config(page_title="Live Crypto Dashboard", layout="wide")
+st.title("📊 Live Crypto Dashboard (CoinGecko)")
 
-@st.cache_data(ttl=300)
-def fetch_price():
-    url = f"{API_URL}/simple/price"
+# Funksioni për marrjen e çmimeve
+@st.cache_data(ttl=300)  # cache për 5 minuta
+def fetch_prices():
+    ids = ','.join(coins.values())
+    url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
-        "ids": coin_id,
-        "vs_currencies": "usd",
-        "include_24hr_change": "true"
+        'ids': ids,
+        'vs_currencies': 'usd',
+        'include_24hr_change': 'true'
     }
-    r = requests.get(url)
-    if r.status_code == 200:
-        data = r.json()
-        return data.get(coin_id, {})
-    else:
+    response = requests.get(url, params=params)
+    if response.status_code != 200:
+        st.error("❌ Gabim gjatë marrjes së të dhënave")
         return {}
+    return response.json()
 
-@st.cache_data(ttl=300)
-def fetch_market_data(days=90):
-    url = f"{API_URL}/coins/{coin_id}/market_chart"
-    params = {
-        "vs_currency": "usd",
-        "days": days
-    }
-    r = requests.get(url)
-    if r.status_code != 200:
-        return pd.DataFrame()
-    prices = r.json().get("prices", [])
-    df = pd.DataFrame(prices, columns=["timestamp", "price"])
-    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-    df.set_index("timestamp", inplace=True)
-    df["rsi"] = ta.momentum.RSIIndicator(df["price"], window=14).rsi()
-    df["ma50"] = df["price"].rolling(window=50).mean()
-    df["ma200"] = df["price"].rolling(window=200).mean()
-    return df.dropna()
+# Funksioni për shfaqjen e të dhënave
+def display_data(data):
+    rows = []
+    for symbol, coingecko_id in coins.items():
+        coin_data = data.get(coingecko_id)
+        if coin_data:
+            price = coin_data.get("usd")
+            change = coin_data.get("usd_24h_change")
+            rows.append({
+                "Symbol": symbol,
+                "Price ($)": round(price, 6),
+                "24h Change (%)": round(change, 2)
+            })
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True)
 
-# Ngarko të dhënat
-price_data = fetch_price()
-market_df = fetch_market_data()
+# Rifreskimi çdo 15 sekonda
+if 'last_run' not in st.session_state:
+    st.session_state.last_run = time.time()
 
-if price_data and not market_df.empty:
-    current_price = price_data.get("usd", 0)
-    change_24h = price_data.get("usd_24h_change", 0)
-    latest_rsi = market_df["rsi"].iloc[-1]
-    ma50 = market_df["ma50"].iloc[-1]
-    ma200 = market_df["ma200"].iloc[-1]
+if time.time() - st.session_state.last_run > 15:
+    st.session_state.last_run = time.time()
+    st.rerun()
 
-    trend = "📈 Bullish" if ma50 > ma200 else "📉 Bearish"
+data = fetch_prices()
+display_data(data)
 
-    if latest_rsi < 30 and trend == "📈 Bullish":
-        signal = "🚀 Bli"
-    elif latest_rsi > 70 and trend == "📉 Bearish":
-        signal = "⚠️ Shit"
-    else:
-        signal = "➡️ Mbaj"
-
-    st.metric("💰 Çmimi BTC", f"${current_price:,.2f}", f"{change_24h:.2f}% / 24h")
-    st.markdown(f"**RSI:** `{latest_rsi:.2f}` | **Trend:** {trend} | **{signal}**")
-    st.line_chart(market_df[["price", "ma50", "ma200"]])
-
-else:
-    st.error("❌ Nuk u ngarkuan të dhënat. Kontrollo lidhjen ose API-në.")
+st.caption("💡 Të dhënat përditësohen automatikisht çdo 15 sekonda • Burimi: CoinGecko")
