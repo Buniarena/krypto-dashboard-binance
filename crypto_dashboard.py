@@ -4,8 +4,8 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 from streamlit_autorefresh import st_autorefresh
 
-# Rifreskim automatik çdo 10 sekonda
-st_autorefresh(interval=10000, key="datarefresh")
+# Rifreskim automatik çdo 15 sekonda (15000 ms)
+st_autorefresh(interval=15000, key="datarefresh")
 
 coins = {
     "Bitcoin": "bitcoin",
@@ -34,7 +34,7 @@ def get_historical_prices(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {
         "vs_currency": "usd",
-        "days": "30",  # 30 ditë historik
+        "days": "30",
         "interval": "daily"
     }
     response = requests.get(url, params=params, timeout=10)
@@ -90,4 +90,4 @@ for name, coin_id in coins.items():
 
 df = pd.DataFrame(rows)
 st.table(df)
-st.caption("🔄 Të dhënat rifreskohen çdo 10 sekonda. Burimi: CoinGecko | RSI bazuar në çmimet ditore të 30 ditëve.")
+st.caption("🔄 Të dhënat rifreskohen çdo 15 sekonda. Burimi: CoinGecko | RSI bazuar në çmimet ditore të 30 ditëve.")
