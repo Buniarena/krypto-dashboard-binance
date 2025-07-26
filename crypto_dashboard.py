@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import pandas as pd
 
 coins = {
     "Bitcoin": "bitcoin",
@@ -9,7 +10,7 @@ coins = {
     "Bonk": "bonk"
 }
 
-st.title("📊 Çmimi Aktual për Coinet")
+st.title("📊 Çmimi Aktual për Coinet (Tabela)")
 
 def get_current_price(coin_id):
     url = "https://api.coingecko.com/api/v3/simple/price"
@@ -26,12 +27,16 @@ def get_current_price(coin_id):
     except:
         return None
 
+data = []
 for name, coin_id in coins.items():
-    st.markdown(f"### {name}")
     price = get_current_price(coin_id)
     if price is not None:
-        st.write(f"💰 **Çmimi aktual:** ${price}")
+        data.append({"Coin": name, "Çmimi aktual (USD)": f"${price}"})
     else:
-        st.warning("⚠️ Nuk u morën të dhënat. CoinGecko mund të jetë offline ose ka problem lidhjeje.")
+        data.append({"Coin": name, "Çmimi aktual (USD)": "Nuk u morën të dhënat"})
+
+df = pd.DataFrame(data)
+
+st.table(df)
 
 st.caption("🔄 Të dhënat rifreskohen çdo herë që hap aplikacionin. Burimi: CoinGecko")
