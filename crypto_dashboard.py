@@ -4,9 +4,8 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 import time
 
-REFRESH_INTERVAL = 180  # Rifreskimi automatik çdo 3 minuta
+REFRESH_INTERVAL = 180  # 3 minuta
 
-# Inicializimi i kohës së rifreskimit
 if "start_time" not in st.session_state:
     st.session_state.start_time = time.time()
 
@@ -19,17 +18,38 @@ def refresh_if_needed():
         st.session_state.start_time = time.time()
         st.experimental_rerun()
 
-st.title("📊 Dashboard: Çmimi, RSI dhe Ndryshimi 24h")
+# Funksioni për të luajtur tinguj sinjali
+def play_alert_sound(signal):
+    if signal == "🟢 Bli":
+        sound_url = "https://actions.google.com/sounds/v1/alarms/bugle_tune.ogg"
+    elif signal == "🔴 Shit":
+        sound_url = "https://actions.google.com/sounds/v1/alarms/beep_short.ogg"
+    else:
+        return
+    st.components.v1.html(f"""
+    <audio autoplay>
+      <source src="{sound_url}" type="audio/ogg">
+    </audio>
+    """, height=0)
 
-# Butoni për rifreskim manual
-if st.button("🔁 Rifresko Tani"):
-    st.session_state.start_time = time.time()
-    st.experimental_rerun()
+st.markdown("""
+    <div style='
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap: 10px;
+        margin-bottom: 20px;
+    '>
+        <div style='font-size:48px;'>🏟️</div>
+        <h1 style='color:#00BFFF; margin:0;'>ARENA BUNI</h1>
+    </div>
+""", unsafe_allow_html=True)
+
+st.title("📊 Dashboard: Çmimi, RSI dhe Ndryshimi 24h")
 
 countdown_placeholder = st.empty()
 refresh_if_needed()
 
-# Lista e kriptomonedhave
 coins = {
     "Bitcoin": "bitcoin",
     "PEPE": "pepe",
@@ -41,7 +61,7 @@ coins = {
 
 @st.cache_data(ttl=REFRESH_INTERVAL)
 def get_market_data(coin_ids):
-    url = "https://api.coingecko.com/api/v3/coins/markets"
+    url = f"https://api.coingecko.com/api/v3/coins/markets"
     params = {
         "vs_currency": "usd",
         "ids": ",".join(coin_ids),
@@ -56,8 +76,8 @@ def get_historical_prices(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {
         "vs_currency": "usd",
-        "days": "1",
-        "interval": "hourly"
+        "days": "30",
+        "interval": "daily"
     }
     response = requests.get(url, params=params, timeout=10)
     response.raise_for_status()
@@ -66,7 +86,6 @@ def get_historical_prices(coin_id):
     df["price"] = df["price"].astype(float)
     return df
 
-# RSI ➤ sinjali dhe ngjyra
 def get_signal(rsi):
     if isinstance(rsi, float):
         if rsi < 30:
@@ -86,7 +105,6 @@ def signal_color(signal):
         return "orange"
     return "gray"
 
-# Marrja e të dhënave aktuale të tregut
 try:
     market_data = get_market_data(list(coins.values()))
 except Exception as e:
@@ -95,7 +113,6 @@ except Exception as e:
 
 market_data_dict = {coin["id"]: coin for coin in market_data}
 
-# Paraqitja e të dhënave për çdo coin
 for name, coin_id in coins.items():
     data = market_data_dict.get(coin_id)
     if data:
@@ -115,14 +132,13 @@ for name, coin_id in coins.items():
             col1, col2, col3, col4 = st.columns(4)
             col1.metric("💰 Çmimi (USD)", f"${price:,.6f}")
             col2.metric("📊 Ndryshimi 24h", f"{change_24h:.2f}%")
-            col3.metric("📈 RSI (1 ditë)", f"{rsi_value}" if rsi_value is not None else "N/A")
+            col3.metric("📈 RSI (14 ditë)", f"{rsi_value}" if rsi_value is not None else "N/A")
             col4.markdown(f"<span style='color:{color}; font-weight:bold; font-size:24px'>{signal}</span>", unsafe_allow_html=True)
     else:
         st.warning(f"Nuk u morën të dhënat për {name}.")
 
-st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL//60} minuta ose manualisht me butonin më lart. Burimi: CoinGecko")
+st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL//60} minuta. Burimi: CoinGecko")
 
-# Timer vizual për rifreskim automatik
 for i in range(seconds_remaining(), -1, -1):
     countdown_placeholder.markdown(f"⏳ Rifreskimi i ardhshëm në: **{i} sekonda**")
     time.sleep(1)
