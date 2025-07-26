@@ -1,62 +1,43 @@
 import streamlit as st
-import requests
 import pandas as pd
-import time
+import requests
+import ta
 
-# Konfiguro pamjen e aplikacionit
-st.set_page_config(
-    page_title="Live Crypto Dashboard",
-    page_icon="📊",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
+# Titulli dhe përshkrimi
+st.set_page_config(page_title="Live Crypto Dashboard", layout="wide")
+st.markdown("<h1 style='text-align: center;'>📊 ARENA BUNI - Live Crypto Dashboard</h1>", unsafe_allow_html=True)
 
-# Titulli
-st.markdown("<h1 style='text-align: center;'>📊 Live Crypto Dashboard<br>(CoinGecko)</h1>", unsafe_allow_html=True)
+# Lista e kriptovalutave që duam të shfaqim
+coins = ["bitcoin", "xvg", "floki", "vet", "bonk", "dogecoin", "shiba-inu", "wink"]
 
-# Lista e monedhave që do të shfaqim
-coins = {
-    "BTC": "bitcoin",
-    "XVG": "verge",
-    "FLOKI": "floki",
-    "VET": "vechain",
-    "BONK": "bonk",
-    "DOGE": "dogecoin",
-    "SHIB": "shiba-inu",
-    "WIN": "wink"
-}
+# Marrja e të dhënave nga CoinGecko
+url = f"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids={','.join(coins)}&price_change_percentage=24h"
+response = requests.get(url)
 
-def get_prices():
-    prices = []
-    for symbol, coingecko_id in coins.items():
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coingecko_id}&vs_currencies=usd&include_24hr_change=true"
-        response = requests.get(url)
-        data = response.json()
+if response.status_code == 200:
+    data = response.json()
 
-        try:
-            price = data[coingecko_id]["usd"]
-            change = data[coingecko_id]["usd_24h_change"]
-        except KeyError:
-            price = 0
-            change = 0
+    # Përgatitja e dataframe
+    df = pd.DataFrame([{
+        "Symbol": coin["symbol"].upper(),
+        "Price ($)": coin["current_price"],
+        "24h Change (%)": round(coin["price_change_percentage_24h"], 2)
+    } for coin in data])
 
-        prices.append({
-            "Symbol": symbol,
-            "Price ($)": round(price, 8),
-            "24h Change (%)": round(change, 2)
-        })
+    # Vendosje vlerave të RSI fiktivisht për ilustrim
+    df["RSI"] = [65, 25, 75, 45, 30, 70, 50, 35]  # Shembull
 
-    df = pd.DataFrame(prices)
-    return df
+    # Ngjyrosje për RSI nën 30 ose mbi 70
+    def color_rsi(val):
+        if val < 30:
+            return "background-color: #ffcccc"  # e kuqe e lehtë
+        elif val > 70:
+            return "background-color: #ccffcc"  # e gjelbër e lehtë
+        return ""
 
-# Vendos një placeholder për tabelën që do të rifreskohet
-table_placeholder = st.empty()
+    # Shfaqja e tabelës
+    st.dataframe(df.style.applymap(color_rsi, subset=["RSI"]), use_container_width=True)
 
-# Refresh çdo 15 sekonda
-while True:
-    df = get_prices()
-    table_placeholder.dataframe(df, use_container_width=True)
-
-    st.markdown("<p style='text-align: center;'>💡 Të dhënat përditësohen automatikisht çdo 15 sekonda • Burimi: <strong>CoinGecko</strong></p>", unsafe_allow_html=True)
-    
-    time.sleep(15)
+    st.markdown("💡 Të dhënat merren nga CoinGecko pa rifreskim automatik.")
+else:
+    st.error("❌ Nuk u morën të dhënat nga CoinGecko.")
