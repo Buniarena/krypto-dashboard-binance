@@ -22,7 +22,7 @@ st.set_page_config(page_title="📊 Live Crypto Dashboard", layout="wide")
 st.title("📈 Live Crypto Dashboard (CoinGecko)")
 
 # Funksioni për marrjen e çmimeve
-@st.cache_data(ttl=300)  # cache për 5 minuta
+@st.cache_data(ttl=300)
 def fetch_prices():
     ids = ','.join(coins.values())
     url = "https://api.coingecko.com/api/v3/simple/price"
@@ -37,32 +37,25 @@ def fetch_prices():
         return {}
     return response.json()
 
-# Funksioni për marrjen e të dhënave historike për një coin të vetëm
+# Funksioni për marrjen e detajeve për një coin
 @st.cache_data(ttl=300)
 def fetch_coin_details(coin_id):
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-    params = {
-        'vs_currency': 'usd',
-        'days': '7',
-        'interval': 'daily'
-    }
-    response = requests.get(url, params=params)
-    if response.status_code != 200:
-        return None
-    return response.json()
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()
+    return None
 
-# Funksioni për ngjyrosjen e ndryshimeve
+# Ngjyrosja e ndryshimeve
 def highlight_changes(val):
-    if isinstance(val, str) and "%" in val:
-        try:
-            number = float(val.replace('% 🔴','').replace('% 🟢','').strip())
-            color = 'lightgreen' if number > 0 else 'salmon'
-            return f'background-color: {color}'
-        except:
-            return ''
-    return ''
+    try:
+        number = float(str(val).split('%')[0])
+        color = 'lightgreen' if number > 0 else 'salmon'
+        return f'background-color: {color}'
+    except:
+        return ''
 
-# Shfaqja e tabelës
+# Paraqitja e të dhënave
 def display_data(data):
     rows = []
     for symbol, coingecko_id in coins.items():
@@ -73,15 +66,29 @@ def display_data(data):
             emoji = "🟢" if change and change > 0 else "🔴"
             comment = "📈 Rritje" if change and change > 0 else "📉 Rënie"
             rows.append({
-                "Symbol": symbol,
+                "Coin": symbol,
                 "Price ($)": round(price, 6),
-                "24h Change (%)": f"{round(change, 2)}% {emoji}",
+                "24h Change": f"{round(change, 2)}% {emoji}",
                 "Comment": comment
             })
     df = pd.DataFrame(rows)
-    st.dataframe(df.style.applymap(highlight_changes, subset=["24h Change (%)"]), use_container_width=True)
+    st.dataframe(df.style.applymap(highlight_changes, subset=["24h Change"]), use_container_width=True)
 
-# Rifreskimi çdo 15 sekonda
+    # Klik për të zgjedhur një coin
+    selected = st.selectbox("🔎 Zgjidh një monedhë për të parë detaje:", list(coins.keys()))
+    coin_id = coins[selected]
+    coin_detail = fetch_coin_details(coin_id)
+
+    if coin_detail:
+        st.subheader(f"📘 Detaje për {selected}")
+        st.write(f"**Emri i plotë:** {coin_detail.get('name')}")
+        st.write(f"**Simboli:** {coin_detail.get('symbol').upper()}")
+        st.write(f"**Renditja në treg:** #{coin_detail.get('market_cap_rank')}")
+        st.write(f"**Website:** [{coin_detail['links']['homepage'][0]}]({coin_detail['links']['homepage'][0]})")
+        st.write("**Përshkrimi:**", coin_detail.get("description", {}).get("en", "")[:400] + "...")
+
+
+# Rifreskim çdo 15 sekonda
 if 'last_run' not in st.session_state:
     st.session_state.last_run = time.time()
 
@@ -89,14 +96,11 @@ if time.time() - st.session_state.last_run > 15:
     st.session_state.last_run = time.time()
     st.rerun()
 
-# Marrja e çmimeve
+# Marrja dhe shfaqja e të dhënave
 data = fetch_prices()
-
 if data:
     display_data(data)
-    st.divider()
+else:
+    st.warning("⚠️ Të dhënat nuk janë të disponueshme tani.")
 
-    # Përzgjedhja e një coini për detaje
-    coin_name = st.selectbox("🔍 Zgjidh një kriptomonedhë për më shumë detaje", list(coins.keys()))
-    coin_id = coins[coin_name]
-    coin_detail = fetch_coin_details(coin
+st.caption("📡 Marrë nga CoinGecko • Rifreskim automatik çdo 15 sekonda")
