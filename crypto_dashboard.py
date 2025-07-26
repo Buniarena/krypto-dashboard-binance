@@ -1,62 +1,75 @@
 import streamlit as st
-import pandas as pd
 import requests
-from ta.momentum import RSIIndicator
-from ta.trend import SMAIndicator
-import time
+import pandas as pd
+import ta
 
-st.set_page_config(page_title="Paneli i Kriptovalutave", layout="wide")
-st.title("📈 Çmimet dhe RSI / MA për BTC, ETH & XRP")
+# Liste der Coins mit CoinGecko-IDs
+coins = {
+  "XRP": "ripple",
+  "BTC": "bitcoin",
+  "ETH": "ethereum",
+  "VECHAIN": "vechain",
+  "DOGE": "dogecoin",
+  "FLOKI": "floki",
+  "PEPE": "pepecoin-community"  # ID für die Community-Variante von PepeCoin
+}
 
-@st.cache_data(ttl=300)
-def merr_te_dhena(coin_id):
-    try:
-        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-        params = {
-            "vs_currency": "usd",
-            "days": "1",
-            "interval": "minute"
-        }
-        r = requests.get(url, params=params)
-        r.raise_for_status()
-        data = r.json()["prices"]
-        df = pd.DataFrame(data, columns=["koha", "cmimi"])
-        df["koha"] = pd.to_datetime(df["koha"], unit="ms")
-        df.set_index("koha", inplace=True)
-        return df
-    except:
+st.set_page_config(page_title="Krypto Trend & Kauf Dashboard", page_icon="📈", layout="wide")
+st.title("📈 Krypto Trend & Kauf Dashboard")
+
+# Funktion: Live-Preise holen
+def fetch_prices():
+    ids = ",".join(coins.values())
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=eur"
+    res = requests.get(url)
+    if res.status_code != 200:
+        st.error("Fehler beim Laden der Preise")
         return None
+    return res.json()
 
-def analiz_monede(emri_shfaqur, coin_id):
-    st.subheader(emri_shfaqur)
-    df = merr_te_dhena(coin_id)
-    if df is None or df.empty:
-        st.error(f"Nuk u morën të dhëna për {emri_shfaqur}")
-        return
+# Funktion: Chartdaten inklusive RSI, MA50, MA200 berechnen
+@st.cache_data(ttl=300)
+def fetch_market_data(coin_id, days=60):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency=eur&days={days}"
+    data = requests.get(url).json()
+    prices = data.get("prices", [])
+    df = pd.DataFrame(prices, columns=["timestamp", "price"])
+    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+    df.set_index("timestamp", inplace=True)
+    df["rsi"] = ta.momentum.rsi(df["price"], window=14)
+    df["ma50"] = df["price"].rolling(window=50).mean()
+    df["ma200"] = df["price"].rolling(window=200).mean()
+    return df.dropna()
 
-    cmimi = df["cmimi"].iloc[-1]
-    rsi = RSIIndicator(df["cmimi"]).rsi().iloc[-1]
-    ma = SMAIndicator(df["cmimi"], window=20).sma_indicator().iloc[-1]
+prices = fetch_prices()
 
-    kol1, kol2, kol3 = st.columns(3)
-    kol1.metric("💰 Çmimi", f"${cmimi:,.2f}")
-    kol2.metric("📊 RSI", f"{rsi:.2f}")
-    kol3.metric("📉 MA (20)", f"${ma:,.2f}")
+if not prices:
+    st.warning("Keine Preisdaten verfügbar.")
+else:
+    for sym, cid in coins.items():
+        eur_price = prices.get(cid, {}).get("eur")
+        if eur_price is None:
+            st.write(f"⚠️ {sym}: Preis nicht gefunden")
+            continue
 
-    if rsi > 70:
-        st.warning("⚠️ RSI: Mbiblerje")
-    elif rsi < 30:
-        st.success("✅ RSI: Nënçmim")
-    else:
-        st.info("ℹ️ RSI: Neutral")
+        df = fetch_market_data(cid, days=60)
+        if df.empty:
+            st.write(f"⚠️ {sym}: Marktdaten nicht verfügbar")
+            continue
 
-    st.line_chart(df["cmimi"])
+        latest_rsi = df["rsi"].iloc[-1]
+        ma50 = df["ma50"].iloc[-1]
+        ma200 = df["ma200"].iloc[-1]
+        trend = "Bullish 📈" if ma50 > ma200 else "Bearish 📉"
 
-# Thirrja për analizë të tre kriptove
-analiz_monede("Bitcoin (BTC)", "bitcoin")
-analiz_monede("Ethereum (ETH)", "ethereum")
-analiz_monede("Ripple (XRP)", "ripple")
+        if latest_rsi < 30 and trend == "Bullish 📈":
+            signal = "🚀 Kauf empfohlen!"
+        elif latest_rsi > 70 and trend == "Bearish 📉":
+            signal = "⚠️ Verkauf empfohlen!"
+        else:
+            signal = "➡️ Halten"
 
-st.caption("⏱️ Rifreskim automatik çdo 15 sekonda. Cache: 5 minuta.")
-time.sleep(15)
-st.experimental_rerun()
+        st.subheader(f"{sym}: €{eur_price:.6f} | {trend} | RSI: {latest_rsi:.1f} | {signal}")
+        st.line_chart(df[["price", "ma50", "ma200"]], height=250)
+
+st.caption("Daten via CoinGecko • RSI & MA • Auto-Refresh Deck 15 s • Cache 5 Min")
