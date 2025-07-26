@@ -77,19 +77,26 @@ def get_market_data(coin_ids):
     return response.json()
 
 @st.cache_data(ttl=REFRESH_INTERVAL)
-def get_historical_prices(coin_id):
+def get_historical_prices_safe(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {
         "vs_currency": "usd",
-        "days": "30",
+        "days": "60",  # më shumë pika për MACD
         "interval": "daily"
     }
-    response = requests.get(url, params=params, timeout=10)
-    response.raise_for_status()
-    prices = response.json()["prices"]
-    df = pd.DataFrame(prices, columns=["timestamp", "price"])
-    df["price"] = df["price"].astype(float)
-    return df
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        prices = response.json()["prices"]
+        df = pd.DataFrame(prices, columns=["timestamp", "price"])
+        df["price"] = df["price"].astype(float)
+        return df
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 429:
+            st.warning(f"Kufizim API (429) për {coin_id}. Nuk mund të marrim të dhënat aktuale.")
+            return None
+        else:
+            raise e
 
 def get_signal(rsi, macd_diff):
     if isinstance(rsi, float) and isinstance(macd_diff, float):
@@ -118,10 +125,6 @@ except Exception as e:
 
 market_data_dict = {coin["id"]: coin for coin in market_data}
 
-# Për të shmangur 429 errors, do të përdorim cache të rezultateve për historikun dhe delay 1 sekondë midis kërkesave.
-
-historical_cache = {}
-
 for idx, (name, coin_id) in enumerate(coins.items()):
     data = market_data_dict.get(coin_id)
     if data:
@@ -129,20 +132,23 @@ for idx, (name, coin_id) in enumerate(coins.items()):
         change_24h = data["price_change_percentage_24h"]
 
         try:
-            if coin_id in historical_cache:
-                hist_df = historical_cache[coin_id]
+            if idx != 0:
+                time.sleep(1)  # Delay për shmangien e 429
+
+            hist_df = get_historical_prices_safe(coin_id)
+            if hist_df is None:
+                rsi_value = None
+                macd_diff_value = None
             else:
-                hist_df = get_historical_prices(coin_id)
-                historical_cache[coin_id] = hist_df
-                if idx != 0:
-                    time.sleep(1)  # delay 1 sekondë midis kërkesave për historikun
+                # Debug print - mund t'i hiqni më vonë
+                st.write(f"{name} - Numri i të dhënave historike: {len(hist_df)}")
 
-            rsi = RSIIndicator(close=hist_df["price"]).rsi().iloc[-1]
-            rsi_value = round(rsi, 2)
+                rsi = RSIIndicator(close=hist_df["price"]).rsi().iloc[-1]
+                rsi_value = round(rsi, 2)
 
-            macd_indicator = MACD(close=hist_df["price"])
-            macd_diff = macd_indicator.macd_diff().iloc[-1]
-            macd_diff_value = round(macd_diff, 4)
+                macd_indicator = MACD(close=hist_df["price"])
+                macd_diff = macd_indicator.macd_diff().iloc[-1]
+                macd_diff_value = round(macd_diff, 4)
         except Exception as e:
             rsi_value = None
             macd_diff_value = None
