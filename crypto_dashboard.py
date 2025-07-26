@@ -4,7 +4,7 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 import time
 
-REFRESH_INTERVAL = 180  # 180 sekonda = 3 minuta
+REFRESH_INTERVAL = 180  # sekonda
 
 if "start_time" not in st.session_state:
     st.session_state.start_time = time.time()
@@ -21,7 +21,9 @@ def refresh_if_needed():
         st.session_state.start_time = time.time()
         st.experimental_rerun()
 
-st.title("📊 Dashboard: Çmimi, RSI dhe % Ndryshim 24h për Coinet")
+st.set_page_config(page_title="Krypto Dashboard", layout="wide")
+st.title("📊 Krypto Dashboard: Çmimi • % Ndryshim • RSI • Sinjali")
+
 countdown_placeholder = st.empty()
 refresh_if_needed()
 
@@ -92,11 +94,15 @@ def play_alert_sound(signal):
     </audio>
     """, height=0)
 
+# Merr çmimet dhe ndryshimin 24h
 try:
     price_data = get_prices_and_change(list(coins.values()))
 except requests.exceptions.RequestException as e:
     st.error(f"Gabim API: {e}")
     price_data = {}
+
+# Krijo një listë me të dhëna për tabelën
+table_rows = []
 
 for name, coin_id in coins.items():
     price_info = price_data.get(coin_id, {})
@@ -112,31 +118,41 @@ for name, coin_id in coins.items():
 
     signal = get_signal(rsi_value)
 
+    # Alarm për sinjal të ri
     if (isinstance(rsi_value, float) and (rsi_value < 30 or rsi_value > 70)):
         if st.session_state.last_signal.get(name) != signal:
             play_alert_sound(signal)
             st.session_state.last_signal[name] = signal
 
-    signal_html = f'<span style="color:{signal_color(signal)}; font-weight:bold;">{signal}</span>'
+    # Ngjyra për sinjal
+    color = signal_color(signal)
+    signal_html = f'<span style="color:{color}; font-weight:bold;">{signal}</span>'
 
-    with st.container():
-        st.markdown(f"### {name}")
-        if price is not None:
-            col1, col2, col3, col4 = st.columns([1.5, 1.5, 1.5, 1])
-            col1.metric(label="💰 Çmimi aktual (USD)", value=f"${price:,.6f}")
-            col2.metric(label="📈 RSI (14 ditë)", value=f"{rsi_value}" if rsi_value is not None else "N/A")
-            if change_24h is not None:
-                change_color = "🟢" if change_24h >= 0 else "🔴"
-                col3.metric(label="📊 % Ndryshim (24h)", value=f"{change_color} {change_24h:.2f}%")
-            else:
-                col3.markdown("❓ % 24h N/A")
-            col4.markdown(signal_html, unsafe_allow_html=True)
-        else:
-            st.warning("Nuk u morën të dhënat për këtë coin.")
+    # Rreshti në tabelë
+    row = {
+        "🪙 Coin": name,
+        "💰 Çmimi": f"${price:,.6f}" if price is not None else "N/A",
+        "📊 % Ndryshim (24h)": f"{change_24h:.2f}%" if change_24h is not None else "N/A",
+        "📈 RSI": f"{rsi_value}" if rsi_value is not None else "N/A",
+        "⚠️ Sinjali": signal_html
+    }
+    table_rows.append(row)
 
-st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL//60} minuta. Burimi: CoinGecko | RSI llogaritur nga çmimet ditore për 30 ditë.")
+# Shfaq të dhënat si tabelë me HTML për sinjalin
+df = pd.DataFrame(table_rows)
+st.write("### 📋 Tabela e Coin-ëve me sinjale:")
 
-# ⏳ Koha për rifreskim
+# Render tabela me HTML për sinjalin
+from st_aggrid import AgGrid, GridOptionsBuilder
+
+gb = GridOptionsBuilder.from_dataframe(df)
+gb.configure_column("⚠️ Sinjali", editable=False, cellRenderer='html')
+gridOptions = gb.build()
+AgGrid(df, gridOptions=gridOptions, allow_unsafe_jscode=True, fit_columns_on_grid_load=True)
+
+st.caption(f"⏱️ Rifreskimi automatik çdo {REFRESH_INTERVAL//60} minuta")
+
+# Timer i mbetur
 for i in range(seconds_remaining(), -1, -1):
     countdown_placeholder.markdown(f"⏳ Rifreskimi i ardhshëm në: **{i} sekonda**")
     time.sleep(1)
