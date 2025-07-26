@@ -3,10 +3,13 @@ import requests
 import pandas as pd
 import time
 from ta.momentum import RSIIndicator
-from ta.trend import MACD
 
 # Konfigurime
 REFRESH_INTERVAL = 180  # sekonda (3 minuta)
+
+# Foto për sfondin e kryesimit - URL
+HEADER_IMAGE_URL = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80"
+# (Ky është një imazh i barit me palma - nga Unsplash, falas)
 
 # Lista e monedhave me emër dhe ID CoinGecko
 coins = {
@@ -48,26 +51,23 @@ def get_historical_prices(coin_id):
     except Exception:
         return pd.DataFrame()
 
-# Llogarit RSI dhe MACD
-def calculate_indicators(df):
-    if df.empty or len(df) < 35:
-        return None, None
+# Llogarit RSI
+def calculate_rsi(df):
+    if df.empty or len(df) < 14:
+        return None
     try:
         rsi = RSIIndicator(close=df["price"]).rsi().iloc[-1]
-        macd_line = MACD(close=df["price"]).macd()
-        macd_signal = MACD(close=df["price"]).macd_signal()
-        macd_diff = macd_line - macd_signal
-        return round(rsi, 2), round(macd_diff.iloc[-1], 6)
+        return round(rsi, 2)
     except Exception:
-        return None, None
+        return None
 
-# Gjenero sinjal nga RSI dhe MACD
-def generate_signal(rsi, macd_diff):
-    if rsi is None or macd_diff is None:
+# Gjenero sinjal nga RSI
+def generate_signal(rsi):
+    if rsi is None:
         return "❓ N/A"
-    if rsi < 30 and macd_diff > 0:
+    if rsi < 30:
         return "🟢 Bli"
-    elif rsi > 70 and macd_diff < 0:
+    elif rsi > 70:
         return "🔴 Shit"
     else:
         return "🟡 Mbaj"
@@ -84,13 +84,48 @@ def refresh_if_needed():
     if seconds_remaining() <= 0:
         st.session_state.start_time = time.time()
 
-# UI - Fillimi i dashboard-it
-st.title("📊 Dashboard: RSI, MACD, Çmimi dhe Sinjale")
+# Stil CSS për header me tekst mbi imazh
+header_style = f"""
+    <style>
+    .header-image {{
+        position: relative;
+        width: 100%;
+        height: 180px;
+        background-image: url('{HEADER_IMAGE_URL}');
+        background-size: cover;
+        background-position: center;
+        border-radius: 10px;
+        margin-bottom: 25px;
+    }}
+    .header-text {{
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 4rem;
+        font-weight: 900;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        text-shadow: 2px 2px 10px rgba(0,0,0,0.7);
+        letter-spacing: 8px;
+    }}
+    </style>
+"""
+
+# Shfaq header-in me imazh dhe tekst
+st.markdown(header_style, unsafe_allow_html=True)
+st.markdown(f"""
+    <div class="header-image">
+        <div class="header-text">Bitcoin B</div>
+    </div>
+""", unsafe_allow_html=True)
+
+# Titulli i dashboard-it
+st.title("📊 Dashboard: RSI, Çmimi dhe Sinjale")
 st.caption(f"⏳ Rifreskimi automatik në: {seconds_remaining()} sekonda")
 
 refresh_if_needed()
 
-# Loop për çdo monedhë
 for name, coin_id in coins.items():
     st.subheader(name)
 
@@ -103,18 +138,16 @@ for name, coin_id in coins.items():
 
     price = data.get("current_price", "N/A")
     change_24h = data.get("price_change_percentage_24h", "N/A")
-    rsi, macd_diff = calculate_indicators(historical)
-    signal = generate_signal(rsi, macd_diff)
+    rsi = calculate_rsi(historical)
+    signal = generate_signal(rsi)
 
-    # Formatim i çmimit
+    # Formatim çmimi (më shumë decimal nëse <1)
     price_str = f"${price:,.8f}" if isinstance(price, float) and price < 1 else f"${price:,.2f}"
 
-    # Trego informacionin
     st.markdown(f"""
     💰 **Çmimi:** {price_str}  
     📊 **Ndryshimi 24h:** {change_24h:.2f}%  
     📈 **RSI:** {rsi if rsi is not None else "N/A"}  
-    📉 **MACD diff:** {macd_diff if macd_diff is not None else "N/A"}  
     💡 **Sinjal:** {signal}
     """)
 
