@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import pandas as pd
-import time
 
 coins = {
     "Bitcoin": "bitcoin",
@@ -11,36 +10,33 @@ coins = {
     "Bonk": "bonk"
 }
 
-st.title("📊 Çmimi Aktual për Coinet (Tabela Debug)")
+st.title("📊 Çmimi Aktual për Coinet (Tabela me 1 Kërkesë)")
 
-def get_current_price(coin_id):
+def get_prices(coin_ids):
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
-        "ids": coin_id,
+        "ids": ",".join(coin_ids),
         "vs_currencies": "usd"
     }
     try:
-        response = requests.get(url, params=params, timeout=5)
+        response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
-        data = response.json()
-        price = data.get(coin_id, {}).get("usd", None)
-        if price is None:
-            st.write(f"‼️ Nuk u gjet çmim për {coin_id}")
-        return price
+        return response.json()
     except Exception as e:
-        st.write(f"‼️ Gabim te {coin_id}: {e}")
-        return None
+        st.error(f"Gabim API: {e}")
+        return {}
 
-data = []
+data = get_prices(list(coins.values()))
+
+rows = []
 for name, coin_id in coins.items():
-    price = get_current_price(coin_id)
-    time.sleep(1)  # ngadalëso kërkesat për limit API
+    price = data.get(coin_id, {}).get("usd", None)
     if price is not None:
-        data.append({"Coin": name, "Çmimi aktual (USD)": f"${price}"})
+        rows.append({"Coin": name, "Çmimi aktual (USD)": f"${price}"})
     else:
-        data.append({"Coin": name, "Çmimi aktual (USD)": "Nuk u morën të dhënat"})
+        rows.append({"Coin": name, "Çmimi aktual (USD)": "Nuk u morën të dhënat"})
 
-df = pd.DataFrame(data)
-
+df = pd.DataFrame(rows)
 st.table(df)
+
 st.caption("🔄 Të dhënat rifreskohen çdo herë që hap aplikacionin. Burimi: CoinGecko")
