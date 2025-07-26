@@ -18,30 +18,57 @@ def refresh_if_needed():
         st.session_state.start_time = time.time()
         st.experimental_rerun()
 
-# Funksioni për të luajtur tinguj sinjali
-def play_alert_sound(signal):
-    if signal == "🟢 Bli":
-        sound_url = "https://actions.google.com/sounds/v1/alarms/bugle_tune.ogg"
-    elif signal == "🔴 Shit":
-        sound_url = "https://actions.google.com/sounds/v1/alarms/beep_short.ogg"
-    else:
-        return
-    st.components.v1.html(f"""
-    <audio autoplay>
-      <source src="{sound_url}" type="audio/ogg">
-    </audio>
-    """, height=0)
+# Sfond me CSS dhe overlay me ngjyrë për lexueshmëri
+page_bg_img = '''
+<style>
+body, .stApp {
+    background-image: url("https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1470&q=80");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    height: 100vh;
+    color: white;
+    position: relative;
+}
 
+.main {
+    position: relative;
+    z-index: 1;
+    background: rgba(0,0,0,0.55); /* overlay për lexueshmëri */
+    padding: 20px 40px;
+    border-radius: 15px;
+}
+
+h1, h2, h3, h4, h5, h6, p {
+    color: white !important;
+}
+
+.metric-label, .metric-value {
+    color: white !important;
+}
+
+div.stMarkdown > h1, div.stMarkdown > h2 {
+    color: #00BFFF !important; /* Bluja në tituj */
+}
+
+</style>
+'''
+
+st.markdown(page_bg_img, unsafe_allow_html=True)
+
+# Logo me stil
 st.markdown("""
     <div style='
         display:flex;
         align-items:center;
         justify-content:center;
-        gap: 10px;
-        margin-bottom: 20px;
+        gap: 15px;
+        margin-bottom: 30px;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        text-shadow: 2px 2px 5px rgba(0,0,0,0.7);
     '>
-        <div style='font-size:48px;'>🏟️</div>
-        <h1 style='color:#00BFFF; margin:0;'>ARENA BUNI</h1>
+        <div style='font-size:56px;'>🏟️</div>
+        <h1 style='color:#00BFFF; margin:0; font-weight:900; font-size:48px; letter-spacing: 4px;'>ARENA BUNI</h1>
     </div>
 """, unsafe_allow_html=True)
 
@@ -98,7 +125,7 @@ def get_signal(rsi):
 
 def signal_color(signal):
     if "Bli" in signal:
-        return "green"
+        return "lightgreen"
     elif "Shit" in signal:
         return "red"
     elif "Mbaj" in signal:
@@ -133,7 +160,7 @@ for name, coin_id in coins.items():
             col1.metric("💰 Çmimi (USD)", f"${price:,.6f}")
             col2.metric("📊 Ndryshimi 24h", f"{change_24h:.2f}%")
             col3.metric("📈 RSI (14 ditë)", f"{rsi_value}" if rsi_value is not None else "N/A")
-            col4.markdown(f"<span style='color:{color}; font-weight:bold; font-size:24px'>{signal}</span>", unsafe_allow_html=True)
+            col4.markdown(f"<span style='color:{color}; font-weight:bold; font-size:22px'>{signal}</span>", unsafe_allow_html=True)
     else:
         st.warning(f"Nuk u morën të dhënat për {name}.")
 
