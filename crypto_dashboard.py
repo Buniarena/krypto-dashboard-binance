@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from ta.momentum import RSIIndicator
+from ta.trend import MACD  # Importo MACD nga ta
 import time
 
 REFRESH_INTERVAL = 180  # sekonda
@@ -51,12 +52,11 @@ body, .stApp {
 """
 
 st.markdown(page_style, unsafe_allow_html=True)
-st.title("📊 Dashboard: RSI, Çmimi dhe Sinjale")
+st.title("📊 Dashboard: RSI, MACD, Çmimi dhe Sinjale")
 
 countdown_placeholder = st.empty()
 refresh_if_needed()
 
-# Lista e kriptomonedhave
 coins = {
     "Bitcoin": "bitcoin",
     "PEPE": "pepe",
@@ -98,11 +98,12 @@ def get_historical_prices(coin_id):
     df["price"] = df["price"].astype(float)
     return df
 
-def get_signal(rsi):
-    if isinstance(rsi, float):
-        if rsi < 30:
+def get_signal(rsi, macd_diff):
+    # Vendosim sinjal bazuar në RSI dhe MACD histogram
+    if isinstance(rsi, float) and isinstance(macd_diff, float):
+        if rsi < 30 and macd_diff > 0:
             return "🟢 Bli"
-        elif rsi > 70:
+        elif rsi > 70 and macd_diff < 0:
             return "🔴 Shit"
         else:
             return "🟡 Mbaj"
@@ -134,19 +135,26 @@ for name, coin_id in coins.items():
             hist_df = get_historical_prices(coin_id)
             rsi = RSIIndicator(close=hist_df["price"]).rsi().iloc[-1]
             rsi_value = round(rsi, 2)
-        except:
+
+            macd_indicator = MACD(close=hist_df["price"])
+            macd_diff = macd_indicator.macd_diff().iloc[-1]
+            macd_diff_value = round(macd_diff, 4)
+        except Exception as e:
             rsi_value = None
-        signal = get_signal(rsi_value)
+            macd_diff_value = None
+            st.warning(f"Probleme me llogaritjen e indikatorëve për {name}: {e}")
+
+        signal = get_signal(rsi_value, macd_diff_value)
         color = signal_color(signal)
         alarm_class = "blink" if signal in ["🟢 Bli", "🔴 Shit"] else ""
 
-        # Paraqitje për çdo kriptomonedhë
         st.markdown(f"""
             <div class='block'>
                 <div class='title'>{name}</div>
                 <p>💰 <b>Çmimi:</b> ${price:,.8f}</p>
                 <p>📊 <b>Ndryshimi 24h:</b> {change_24h:.2f}%</p>
                 <p>📈 <b>RSI:</b> {rsi_value if rsi_value else "N/A"}</p>
+                <p>📉 <b>MACD diff:</b> {macd_diff_value if macd_diff_value else "N/A"}</p>
                 <p>💡 <b>Sinjal:</b> <span class='signal {alarm_class}' style='color:{color}'>{signal}</span></p>
             </div>
         """, unsafe_allow_html=True)
@@ -155,7 +163,6 @@ for name, coin_id in coins.items():
 
 st.caption("🔄 Të dhënat rifreskohen automatikisht çdo 3 minuta. Burimi: CoinGecko")
 
-# Timer për rifreskim
 for i in range(seconds_remaining(), -1, -1):
     countdown_placeholder.markdown(f"⏳ Rifreskimi automatik në: **{i} sekonda**")
     time.sleep(1)
