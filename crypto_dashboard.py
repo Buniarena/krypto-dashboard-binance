@@ -1,55 +1,98 @@
-import streamlit as st 
-import pandas as pd 
-import requests 
-import datetime from ta.momentum 
-import RSIIndicator from ta.trend 
-import MACD
+import streamlit as st
+import requests
+import pandas as pd
+import datetime
+from ta.momentum import RSIIndicator
+from ta.trend import MACD
 
-Konfiguro faqen
+# Coin-at që duam të monitorojmë
+coins = {
+    "BTC 🟠": "bitcoin",
+    "XVG 🧿": "verge",
+    "FLOKI 🐶": "floki",
+    "PEPE 🐸": "pepecoin-community",
+    "VET 🔗": "vechain",
+    "BONK 🦴": "bonk",
+    "DOGE 🐕": "dogecoin",
+    "SHIB 🦊": "shiba",
+    "WIN 🎯": "wink",
+    "BTT 📡": "bittorrent-2"
+}
 
-st.set_page_config(page_title="📈 Live Crypto Dashboard", layout="wide") st.title("📊 Live Crypto Dashboard me Sygjerime Bli/Shit/Mbaj")
+st.set_page_config(page_title="📊 Krypto Sinjal Dashboard", layout="wide")
+st.title("📈 Krypto Sinjal Dashboard (CoinGecko + RSI/MACD)")
 
-Lista e coin-ave
+# Funksioni për të marrë çmimet historike (për RSI dhe MACD)
+def fetch_market_chart(coin_id):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+    params = {"vs_currency": "usd", "days": "7", "interval": "hourly"}
+    r = requests.get(url, params=params)
+    if r.status_code == 200:
+        data = r.json()
+        prices = data["prices"]
+        df = pd.DataFrame(prices, columns=["timestamp", "price"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+        return df
+    return None
 
-coins = { "BTC 🟠": "bitcoin", "XVG 🧿": "verge", "FLOKI 🐶": "floki", "PEPE 🐸": "pepecoin-community", "VET 🔗": "vechain", "BONK 🦴": "bonk", "DOGE 🐕": "dogecoin", "SHIB 🦊": "shiba", "WIN 🎯": "wink", "BTT 📡": "bittorrent-2" }
+# Funksioni për analizë teknike dhe vendim
+def analyze_signal(df):
+    if df is None or len(df) < 26:
+        return "N/A", None
 
-Funksioni për të marrë historikun e çmimeve
+    rsi = RSIIndicator(df["price"], window=14).rsi()
+    macd = MACD(df["price"]).macd_diff()
 
-@st.cache_data(ttl=300) def get_price_history(coin_id): url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart" params = {"vs_currency": "usd", "days": "7", "interval": "hourly"} r = requests.get(url, params=params) if r.status_code != 200: return None prices = r.json()["prices"] df = pd.DataFrame(prices, columns=["timestamp", "price"]) df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms") return df
+    latest_rsi = rsi.iloc[-1]
+    latest_macd = macd.iloc[-1]
 
-Funksioni për të analizuar të dhënat
+    if latest_rsi < 30 and latest_macd > 0:
+        return "🟢 BLIJ", latest_rsi
+    elif latest_rsi > 70 and latest_macd < 0:
+        return "🔴 SHIT", latest_rsi
+    else:
+        return "🟡 MBAJ", latest_rsi
 
-def analyze_coin(df): df = df.copy() df.set_index("timestamp", inplace=True) df["rsi"] = RSIIndicator(df["price"], window=14).rsi() macd = MACD(df["price"], window_slow=26, window_fast=12, window_sign=9) df["macd"] = macd.macd() df["macd_signal"] = macd.macd_signal()
+# Marrja e çmimeve të momentit
+def fetch_live_prices():
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    ids = ",".join(coins.values())
+    params = {
+        "ids": ids,
+        "vs_currencies": "usd",
+        "include_24hr_change": "true"
+    }
+    r = requests.get(url, params=params)
+    return r.json() if r.status_code == 200 else {}
 
-last_rsi = df["rsi"].iloc[-1]
-last_macd = df["macd"].iloc[-1]
-last_signal = df["macd_signal"].iloc[-1]
+# Shfaqja e tabelës
+def show_dashboard():
+    data = fetch_live_prices()
+    all_rows = []
 
-# Vendimi
-if last_rsi < 30 and last_macd > last_signal:
-    decision = "🟢 BLIJ"
-elif last_rsi > 70 and last_macd < last_signal:
-    decision = "🔴 SHIT"
-else:
-    decision = "🟡 MBAJ"
+    for name, coin_id in coins.items():
+        price = data.get(coin_id, {}).get("usd", "N/A")
+        change = data.get(coin_id, {}).get("usd_24h_change", 0)
 
-return df, last_rsi, last_macd, last_signal, decision
+        df = fetch_market_chart(coin_id)
+        vendim, rsi = analyze_signal(df)
 
-Aplikimi për çdo coin
+        # Mini-grafiku
+        if df is not None:
+            with st.expander(f"{name} 📉 Mini Grafik"):
+                st.line_chart(df.set_index("timestamp")["price"])
 
-for name, coin_id in coins.items(): st.subheader(f"{name}") df = get_price_history(coin_id) if df is None: st.warning("Nuk u ngarkuan të dhënat.") continue
+        row = {
+            "Coin": name,
+            "Çmimi ($)": round(price, 6),
+            "Ndryshim 24h (%)": round(change, 2),
+            "RSI": round(rsi, 2) if rsi else "N/A",
+            "Vendim": vendim
+        }
+        all_rows.append(row)
 
-df_analysis, rsi, macd, signal, vendim = analyze_coin(df)
+    st.dataframe(pd.DataFrame(all_rows), use_container_width=True)
 
-# Grafiku
-st.line_chart(df.set_index("timestamp")["price"], use_container_width=True)
-
-# Tabela e analizës
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("RSI", f"{rsi:.2f}")
-col2.metric("MACD", f"{macd:.4f}")
-col3.metric("MACD Signal", f"{signal:.4f}")
-col4.metric("Vendimi", vendim)
-
-st.caption("📡 Të dhënat janë marrë nga CoinGecko dhe përditësohen çdo 5 minuta.")
-
+# Ekzekuto dashboardin
+show_dashboard()
+st.caption("📡 Të dhënat nga CoinGecko • RSI/MACD analizë • Rifreskim manual")
