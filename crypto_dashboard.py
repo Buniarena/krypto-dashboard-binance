@@ -59,8 +59,6 @@ coins = {
     "Shiba": "shiba-inu",
     "Bonk": "bonk",
     "XVG (Verge)": "verge",
-    "DOGS": "dogs",
-    "AI": "ai",
     "WIN": "wink",
     "SLP": "smooth-love-potion",
     "DENT": "dent",
