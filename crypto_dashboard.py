@@ -51,14 +51,21 @@ st.title("📊 Dashboard: Çmimi, RSI dhe Ndryshimi 24h")
 countdown_placeholder = st.empty()
 refresh_if_needed()
 
-# Lista e kriptomonedhave
+# Lista e kriptomonedhave me ID nga CoinGecko
 coins = {
     "Bitcoin": "bitcoin",
     "PEPE": "pepe",
     "Doge": "dogecoin",
     "Shiba": "shiba-inu",
     "Bonk": "bonk",
-    "XVG (Verge)": "verge"
+    "XVG (Verge)": "verge",
+    "DOGS": "dogs",
+    "AI": "ai",
+    "WIN": "wink",
+    "SLP": "smooth-love-potion",
+    "DENT": "dent",
+    "SPELL": "spell-token",
+    "PEOPLE": "constitutiondao"
 }
 
 @st.cache_data(ttl=REFRESH_INTERVAL)
@@ -129,7 +136,6 @@ for name, coin_id in coins.items():
         signal = get_signal(rsi_value)
         color = signal_color(signal)
 
-        # Layout vertikal për secilën kriptomonedhë
         st.markdown(f"""
             <div class='block'>
                 <div class='title'>{name}</div>
@@ -142,9 +148,9 @@ for name, coin_id in coins.items():
     else:
         st.warning(f"Nuk u morën të dhënat për {name}.")
 
-st.caption("🔄 Të dhënat rifreskohen automatikisht çdo 3 minuta ose me butonin manual. Burimi: CoinGecko")
+st.caption("🔄 Të dhënat rifreskohen automatikisht çdo 3 minuta. Burimi: CoinGecko")
 
-# Timer i thjeshtë poshtë
+# Timer rifreskimi
 for i in range(seconds_remaining(), -1, -1):
     countdown_placeholder.markdown(f"⏳ Rifreskimi automatik në: **{i} sekonda**")
     time.sleep(1)
