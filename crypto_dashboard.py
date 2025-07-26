@@ -3,8 +3,8 @@ import requests
 import pandas as pd
 from ta.momentum import RSIIndicator
 
-# Rifreskim automatik çdo 15 sekonda (15000 ms)
-st.experimental_autorefresh(interval=15000, key="datarefresh")
+# Rifreskim automatik çdo 10 minuta (600000 ms)
+st.experimental_autorefresh(interval=600000, key="datarefresh")
 
 coins = {
     "Bitcoin": "bitcoin",
@@ -89,4 +89,4 @@ for name, coin_id in coins.items():
 
 df = pd.DataFrame(rows)
 st.table(df)
-st.caption("🔄 Të dhënat rifreskohen çdo 15 sekonda. Burimi: CoinGecko | RSI bazuar në çmimet ditore të 30 ditëve.")
+st.caption("🔄 Të dhënat rifreskohen çdo 10 minuta. Burimi: CoinGecko | RSI bazuar në çmimet ditore të 30 ditëve.")
