@@ -118,16 +118,25 @@ except Exception as e:
 
 market_data_dict = {coin["id"]: coin for coin in market_data}
 
+# Për të shmangur 429 errors, do të përdorim cache të rezultateve për historikun dhe delay 1 sekondë midis kërkesave.
+
+historical_cache = {}
+
 for idx, (name, coin_id) in enumerate(coins.items()):
     data = market_data_dict.get(coin_id)
     if data:
         price = data["current_price"]
         change_24h = data["price_change_percentage_24h"]
-        try:
-            if idx != 0:
-                time.sleep(1)  # Delay për shmangien e 429 errors
 
-            hist_df = get_historical_prices(coin_id)
+        try:
+            if coin_id in historical_cache:
+                hist_df = historical_cache[coin_id]
+            else:
+                hist_df = get_historical_prices(coin_id)
+                historical_cache[coin_id] = hist_df
+                if idx != 0:
+                    time.sleep(1)  # delay 1 sekondë midis kërkesave për historikun
+
             rsi = RSIIndicator(close=hist_df["price"]).rsi().iloc[-1]
             rsi_value = round(rsi, 2)
 
@@ -148,8 +157,8 @@ for idx, (name, coin_id) in enumerate(coins.items()):
                 <div class='title'>{name}</div>
                 <p>💰 <b>Çmimi:</b> ${price:,.8f}</p>
                 <p>📊 <b>Ndryshimi 24h:</b> {change_24h:.2f}%</p>
-                <p>📈 <b>RSI:</b> {rsi_value if rsi_value else "N/A"}</p>
-                <p>📉 <b>MACD diff:</b> {macd_diff_value if macd_diff_value else "N/A"}</p>
+                <p>📈 <b>RSI:</b> {rsi_value if rsi_value is not None else "N/A"}</p>
+                <p>📉 <b>MACD diff:</b> {macd_diff_value if macd_diff_value is not None else "N/A"}</p>
                 <p>💡 <b>Sinjal:</b> <span class='signal {alarm_class}' style='color:{color}'>{signal}</span></p>
             </div>
         """, unsafe_allow_html=True)
