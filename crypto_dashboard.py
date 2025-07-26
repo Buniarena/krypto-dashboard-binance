@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from ta.momentum import RSIIndicator
-from ta.trend import MACD  # Importo MACD nga ta
+from ta.trend import MACD
 import time
 
 REFRESH_INTERVAL = 180  # sekonda
@@ -19,7 +19,6 @@ def refresh_if_needed():
         st.session_state.start_time = time.time()
         st.experimental_rerun()
 
-# CSS për stil elegant dhe alarm vizual
 page_style = """
 <style>
 body, .stApp {
@@ -57,18 +56,19 @@ st.title("📊 Dashboard: RSI, MACD, Çmimi dhe Sinjale")
 countdown_placeholder = st.empty()
 refresh_if_needed()
 
+# Kufizo listën (mund ta zgjerosh gradualisht për test)
 coins = {
     "Bitcoin": "bitcoin",
     "PEPE": "pepe",
     "Doge": "dogecoin",
     "Shiba": "shiba-inu",
     "Bonk": "bonk",
-    "XVG (Verge)": "verge",
-    "WIN": "wink",
-    "SLP": "smooth-love-potion",
-    "DENT": "dent",
-    "SPELL": "spell-token",
-    "PEOPLE": "constitutiondao"
+    # "XVG (Verge)": "verge",
+    # "WIN": "wink",
+    # "SLP": "smooth-love-potion",
+    # "DENT": "dent",
+    # "SPELL": "spell-token",
+    # "PEOPLE": "constitutiondao"
 }
 
 @st.cache_data(ttl=REFRESH_INTERVAL)
@@ -99,7 +99,6 @@ def get_historical_prices(coin_id):
     return df
 
 def get_signal(rsi, macd_diff):
-    # Vendosim sinjal bazuar në RSI dhe MACD histogram
     if isinstance(rsi, float) and isinstance(macd_diff, float):
         if rsi < 30 and macd_diff > 0:
             return "🟢 Bli"
@@ -126,12 +125,16 @@ except Exception as e:
 
 market_data_dict = {coin["id"]: coin for coin in market_data}
 
-for name, coin_id in coins.items():
+for idx, (name, coin_id) in enumerate(coins.items()):
     data = market_data_dict.get(coin_id)
     if data:
         price = data["current_price"]
         change_24h = data["price_change_percentage_24h"]
         try:
+            # Delay 1 sekondë midis kërkesave për të shmangur 429 errors
+            if idx != 0:
+                time.sleep(1)
+
             hist_df = get_historical_prices(coin_id)
             rsi = RSIIndicator(close=hist_df["price"]).rsi().iloc[-1]
             rsi_value = round(rsi, 2)
