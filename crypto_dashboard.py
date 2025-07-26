@@ -1,168 +1,117 @@
 import streamlit as st
 import requests
 import pandas as pd
-from ta.momentum import RSIIndicator
 import time
+from ta.momentum import RSIIndicator
+from ta.trend import MACD
 
+# Konfigurime
 REFRESH_INTERVAL = 180  # sekonda
 
-if "start_time" not in st.session_state:
-st.session_state.start_time = time.time()
-
-def seconds_remaining():
-elapsed = time.time() - st.session_state.start_time
-return max(0, int(REFRESH_INTERVAL - elapsed))
-
-def refresh_if_needed():
-if seconds_remaining() <= 0:
-st.session_state.start_time = time.time()
-st.experimental_rerun()
-
-CSS për stil elegant dhe alarm vizual
-
-page_style = """
-
-<style>  
-body, .stApp {  
-    background-color: #0F172A;  
-    color: white;  
-    font-family: 'Segoe UI', sans-serif;  
-}  
-.block {  
-    background-color: #1E293B;  
-    padding: 20px;  
-    border-radius: 15px;  
-    margin-bottom: 20px;  
-}  
-.title {  
-    font-size: 28px;  
-    font-weight: bold;  
-    color: #60A5FA;  
-}  
-.signal {  
-    font-size: 20px;  
-    font-weight: bold;  
-}  
-.blink {  
-    animation: blinker 1s linear infinite;  
-}  
-@keyframes blinker {  
-    50% { opacity: 0; }  
-}  
-</style>  """
-
-st.markdown(page_style, unsafe_allow_html=True)
-st.title("📊 Dashboard: RSI, Çmimi dhe Sinjale")
-
-countdown_placeholder = st.empty()
-refresh_if_needed()
-
-Lista e kriptomonedhave
-
+# Lista e monedhave me emër dhe ID CoinGecko
 coins = {
-"Bitcoin": "bitcoin",
-"PEPE": "pepe",
-"Doge": "dogecoin",
-"Shiba": "shiba-inu",
-"Bonk": "bonk",
-"XVG (Verge)": "verge",
-"WIN": "wink",
-"SLP": "smooth-love-potion",
-"DENT": "dent",
-"SPELL": "spell-token",
-"PEOPLE": "constitutiondao"
+    "Bitcoin": "bitcoin",
+    "PEPE": "pepe",
+    "Doge": "dogecoin",
+    "Shiba": "shiba-inu",
+    "XVG (Verge)": "verge"
 }
 
+# Funksioni për të marrë çmimin aktual
 @st.cache_data(ttl=REFRESH_INTERVAL)
-def get_market_data(coin_ids):
-url = "https://api.coingecko.com/api/v3/coins/markets"
-params = {
-"vs_currency": "usd",
-"ids": ",".join(coin_ids),
-"price_change_percentage": "24h"
-}
-response = requests.get(url, params=params, timeout=10)
-response.raise_for_status()
-return response.json()
+def get_current_data(coin_id):
+    url = "https://api.coingecko.com/api/v3/coins/markets"
+    params = {
+        "vs_currency": "usd",
+        "ids": coin_id
+    }
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()[0]
+    except Exception as e:
+        return None
 
+# Funksioni për të marrë të dhënat historike të çmimit
 @st.cache_data(ttl=REFRESH_INTERVAL)
 def get_historical_prices(coin_id):
-url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-params = {
-"vs_currency": "usd",
-"days": "30",
-"interval": "daily"
-}
-response = requests.get(url, params=params, timeout=10)
-response.raise_for_status()
-prices = response.json()["prices"]
-df = pd.DataFrame(prices, columns=["timestamp", "price"])
-df["price"] = df["price"].astype(float)
-return df
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+    params = {
+        "vs_currency": "usd",
+        "days": "60",
+        "interval": "daily"
+    }
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        prices = response.json()["prices"]
+        df = pd.DataFrame(prices, columns=["timestamp", "price"])
+        df["price"] = df["price"].astype(float)
+        return df
+    except Exception:
+        return pd.DataFrame()
 
-def get_signal(rsi):
-if isinstance(rsi, float):
-if rsi < 30:
-return "🟢 Bli"
-elif rsi > 70:
-return "🔴 Shit"
-else:
-return "🟡 Mbaj"
-return "❓ N/A"
+# Llogarit RSI dhe MACD
+def calculate_indicators(df):
+    if df.empty or len(df) < 35:
+        return None, None
+    rsi = RSIIndicator(close=df["price"]).rsi().iloc[-1]
+    macd = MACD(close=df["price"])
+    macd_diff = macd.macd_diff().iloc[-1]
+    return round(rsi, 2), round(macd_diff, 6)
 
-def signal_color(signal):
-if "Bli" in signal:
-return "lightgreen"
-elif "Shit" in signal:
-return "red"
-elif "Mbaj" in signal:
-return "orange"
-return "gray"
+# Gjenero sinjal bazuar në RSI dhe MACD
+def generate_signal(rsi, macd_diff):
+    if rsi is None or macd_diff is None:
+        return "❓ N/A"
+    if rsi < 30 and macd_diff > 0:
+        return "🟢 Bli"
+    elif rsi > 70 and macd_diff < 0:
+        return "🔴 Shit"
+    else:
+        return "🟡 Mbaj"
 
-try:
-market_data = get_market_data(list(coins.values()))
-except Exception as e:
-st.error(f"Gabim gjatë marrjes së të dhënave: {e}")
-market_data = []
+# Koha e rifreskimit
+if "start_time" not in st.session_state:
+    st.session_state.start_time = time.time()
 
-market_data_dict = {coin["id"]: coin for coin in market_data}
+def seconds_remaining():
+    elapsed = time.time() - st.session_state.start_time
+    return max(0, int(REFRESH_INTERVAL - elapsed))
 
+def refresh_if_needed():
+    if seconds_remaining() <= 0:
+        st.session_state.start_time = time.time()
+        st.cache_data.clear()
+
+refresh_if_needed()
+
+# Fillimi i dashboardit
+st.title("📊 Dashboard: RSI, MACD, Çmimi dhe Sinjale")
+st.caption(f"⏳ Rifreskimi automatik në: {seconds_remaining()} sekonda")
+
+# Paraqitja e monedhave
 for name, coin_id in coins.items():
-data = market_data_dict.get(coin_id)
-if data:
-price = data["current_price"]
-change_24h = data["price_change_percentage_24h"]
-try:
-hist_df = get_historical_prices(coin_id)
-rsi = RSIIndicator(close=hist_df["price"]).rsi().iloc[-1]
-rsi_value = round(rsi, 2)
-except:
-rsi_value = None
-signal = get_signal(rsi_value)
-color = signal_color(signal)
-alarm_class = "blink" if signal in ["🟢 Bli", "🔴 Shit"] else ""
+    col = st.container()
+    col.subheader(name)
 
-# Paraqitje për çdo kriptomonedhë  
-    st.markdown(f"""  
-        <div class='block'>  
-            <div class='title'>{name}</div>  
-            <p>💰 <b>Çmimi:</b> ${price:,.8f}</p>  
-            <p>📊 <b>Ndryshimi 24h:</b> {change_24h:.2f}%</p>  
-            <p>📈 <b>RSI:</b> {rsi_value if rsi_value else "N/A"}</p>  
-            <p>💡 <b>Sinjal:</b> <span class='signal {alarm_class}' style='color:{color}'>{signal}</span></p>  
-        </div>  
-    """, unsafe_allow_html=True)  
-else:  
-    st.warning(f"Nuk u morën të dhënat për {name}.")
+    data = get_current_data(coin_id)
+    hist_df = get_historical_prices(coin_id)
 
-st.caption("🔄 Të dhënat rifreskohen automatikisht çdo 3 minuta. Burimi: CoinGecko")
+    if data is None:
+        col.error(f"Kufizim API (429) për {coin_id}. Nuk mund të marrim të dhëna.")
+        continue
 
-Timer për rifreskim
+    price = data["current_price"]
+    change = data["price_change_percentage_24h"]
 
-for i in range(seconds_remaining(), -1, -1):
-countdown_placeholder.markdown(f"⏳ Rifreskimi automatik në: {i} sekonda")
-time.sleep(1)
-if i == 0:
-st.experimental_rerun()
-Ma shto në kod edhe MACD sikur RSI
+    rsi, macd_diff = calculate_indicators(hist_df)
+    signal = generate_signal(rsi, macd_diff)
 
+    col.markdown(f"**💰 Çmimi:** ${price:.8f}")
+    col.markdown(f"**📈 Ndryshimi 24h:** {change:.2f}%")
+    col.markdown(f"**📊 RSI:** {rsi if rsi else 'N/A'}")
+    col.markdown(f"**📉 MACD diff:** {macd_diff if macd_diff else 'N/A'}")
+    col.markdown(f"**💡 Sinjal:** {signal}")
+
+st.info("🔄 Të dhënat rifreskohen automatikisht çdo 3 minuta. Burimi: CoinGecko")
