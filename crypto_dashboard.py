@@ -4,23 +4,26 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 import time
 
-# Intervali i rifreskimit në sekonda
-REFRESH_INTERVAL = 600  # 10 minuta
+REFRESH_INTERVAL = 600  # 10 minuta në sekonda
 
-# Koha kur u startua app (në sekonda)
 if "start_time" not in st.session_state:
     st.session_state.start_time = time.time()
 
-# Koha aktuale dhe koha e kaluar
-elapsed_time = time.time() - st.session_state.start_time
-remaining_time = REFRESH_INTERVAL - elapsed_time
+def seconds_remaining():
+    elapsed = time.time() - st.session_state.start_time
+    remaining = REFRESH_INTERVAL - elapsed
+    return max(0, int(remaining))
 
-# Nëse kaluan 10 minuta, rifresko dhe ri-inicializo kohën
-if remaining_time <= 0:
-    st.experimental_rerun()
+def refresh_if_needed():
+    if seconds_remaining() <= 0:
+        st.session_state.start_time = time.time()
+        st.experimental_rerun()
 
-# Shfaq countdown timer
-st.write(f"⏳ Rifreskimi i ardhshëm në: {int(remaining_time)} sekonda")
+st.title("⏳ Countdown për rifreskim të të dhënave")
+
+countdown_placeholder = st.empty()
+
+refresh_if_needed()
 
 coins = {
     "Bitcoin": "bitcoin",
@@ -30,8 +33,6 @@ coins = {
     "Bonk": "bonk",
     "XVG (Verge)": "verge"
 }
-
-st.title("📊 Çmimi Aktual, RSI dhe Sinjali për Coinet")
 
 @st.cache_data(ttl=600)
 def get_prices(coin_ids):
@@ -106,3 +107,10 @@ for name, coin_id in coins.items():
 df = pd.DataFrame(rows)
 st.table(df)
 st.caption("🔄 Të dhënat rifreskohen çdo 10 minuta. Burimi: CoinGecko | RSI bazuar në çmimet ditore të 30 ditëve.")
+
+# Loop për animacion countdown në Streamlit
+for i in range(seconds_remaining(), -1, -1):
+    countdown_placeholder.markdown(f"⏳ Rifreskimi i ardhshëm në: **{i} sekonda**")
+    time.sleep(1)
+    if i == 0:
+        st.experimental_rerun()
