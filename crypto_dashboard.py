@@ -10,9 +10,9 @@ coins = {
     "Bonk": "bonk"
 }
 
-st.title("📊 Çmimi Aktual për Coinet (CoinGecko me Cache)")
+st.title("📊 Çmimi Aktual për Coinet")
 
-@st.cache_data(ttl=600)  # ruaj për 10 minuta për të shmangur limitet
+@st.cache_data(ttl=600)  # ruan përgjigjen për 10 minuta
 def get_prices(coin_ids):
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
@@ -25,8 +25,8 @@ def get_prices(coin_ids):
 
 try:
     data = get_prices(list(coins.values()))
-except Exception as e:
-    st.error(f"Gabim API: {e}")
+except requests.exceptions.HTTPError as err:
+    st.error(f"Gabim API: {err}")
     data = {}
 
 rows = []
@@ -39,5 +39,4 @@ for name, coin_id in coins.items():
 
 df = pd.DataFrame(rows)
 st.table(df)
-
 st.caption("🔄 Të dhënat rifreskohen çdo 10 minuta. Burimi: CoinGecko")
