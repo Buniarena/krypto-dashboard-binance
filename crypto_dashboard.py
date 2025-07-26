@@ -1,112 +1,55 @@
-import streamlit as st
-import requests
-import pandas as pd
-import time
-import plotly.graph_objects as go
+import streamlit as st 
+import pandas as pd 
+import requests 
+import datetime from ta.momentum 
+import RSIIndicator from ta.trend 
+import MACD
 
-# Coin list me emoji dhe CoinGecko ID
-coins = {
-    "BTC 🟠": "bitcoin",
-    "XVG 🧿": "verge",
-    "FLOKI 🐶": "floki",
-    "PEPE 🐸": "pepecoin-community",
-    "VET 🔗": "vechain",
-    "BONK 🦴": "bonk",
-    "DOGE 🐕": "dogecoin",
-    "SHIB 🦊": "shiba",
-    "WIN 🎯": "wink",
-    "BTT 📡": "bittorrent-2"
-}
+Konfiguro faqen
 
-# Konfigurimi i faqes
-st.set_page_config(page_title="📊 Live Crypto Dashboard", layout="wide")
-st.title("📈 Live Crypto Dashboard (CoinGecko)")
+st.set_page_config(page_title="📈 Live Crypto Dashboard", layout="wide") st.title("📊 Live Crypto Dashboard me Sygjerime Bli/Shit/Mbaj")
 
-@st.cache_data(ttl=300)
-def fetch_prices():
-    ids = ','.join(coins.values())
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {
-        'ids': ids,
-        'vs_currencies': 'usd',
-        'include_24hr_change': 'true'
-    }
-    try:
-        response = requests.get(url, params=params)
-        return response.json() if response.status_code == 200 else {}
-    except:
-        return {}
+Lista e coin-ave
 
-@st.cache_data(ttl=300)
-def fetch_chart_data(coin_id):
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-    params = {'vs_currency': 'usd', 'days': '1', 'interval': 'hourly'}
-    try:
-        res = requests.get(url, params=params)
-        if res.status_code == 200:
-            data = res.json()
-            df = pd.DataFrame(data['prices'], columns=['timestamp', 'price'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-            return df
-    except:
-        pass
-    return pd.DataFrame()
+coins = { "BTC 🟠": "bitcoin", "XVG 🧿": "verge", "FLOKI 🐶": "floki", "PEPE 🐸": "pepecoin-community", "VET 🔗": "vechain", "BONK 🦴": "bonk", "DOGE 🐕": "dogecoin", "SHIB 🦊": "shiba", "WIN 🎯": "wink", "BTT 📡": "bittorrent-2" }
 
-def get_signal(change):
-    if change is None:
-        return "❓"
-    elif change > 5:
-        return "🟢 BLIJ"
-    elif change < -5:
-        return "🔴 SHIT"
-    else:
-        return "🟡 MBAJ"
+Funksioni për të marrë historikun e çmimeve
 
-def display_dashboard(data):
-    for name, coin_id in coins.items():
-        coin = data.get(coin_id)
-        if not coin:
-            continue
-        price = coin.get("usd", 0)
-        change = coin.get("usd_24h_change", 0)
+@st.cache_data(ttl=300) def get_price_history(coin_id): url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart" params = {"vs_currency": "usd", "days": "7", "interval": "hourly"} r = requests.get(url, params=params) if r.status_code != 200: return None prices = r.json()["prices"] df = pd.DataFrame(prices, columns=["timestamp", "price"]) df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms") return df
 
-        signal = get_signal(change)
+Funksioni për të analizuar të dhënat
 
-        st.markdown(f"### {name}")
-        col1, col2 = st.columns([2, 5])
-        with col1:
-            st.metric("Çmimi (USD)", f"${price:.6f}", f"{change:.2f}%")
-            st.markdown(f"💬 Koment: **{signal}**")
+def analyze_coin(df): df = df.copy() df.set_index("timestamp", inplace=True) df["rsi"] = RSIIndicator(df["price"], window=14).rsi() macd = MACD(df["price"], window_slow=26, window_fast=12, window_sign=9) df["macd"] = macd.macd() df["macd_signal"] = macd.macd_signal()
 
-        with col2:
-            df = fetch_chart_data(coin_id)
-            if not df.empty:
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=df['timestamp'], y=df['price'],
-                    mode='lines', line=dict(color='deepskyblue')
-                ))
-                fig.update_layout(
-                    height=200,
-                    margin=dict(l=10, r=10, t=20, b=20),
-                    xaxis_title=None, yaxis_title=None,
-                    showlegend=False
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Grafiku nuk mund të ngarkohet.")
+last_rsi = df["rsi"].iloc[-1]
+last_macd = df["macd"].iloc[-1]
+last_signal = df["macd_signal"].iloc[-1]
 
-# Rifreskimi çdo 15 sekonda
-if 'last_run' not in st.session_state:
-    st.session_state.last_run = time.time()
-if time.time() - st.session_state.last_run > 15:
-    st.session_state.last_run = time.time()
-    st.rerun()
-
-data = fetch_prices()
-if data:
-    display_dashboard(data)
+# Vendimi
+if last_rsi < 30 and last_macd > last_signal:
+    decision = "🟢 BLIJ"
+elif last_rsi > 70 and last_macd < last_signal:
+    decision = "🔴 SHIT"
 else:
-    st.error("Nuk mund të marrim të dhënat nga CoinGecko.")
+    decision = "🟡 MBAJ"
 
-st.caption("⏱️ Rifreskim çdo 15 sekonda • Burimi: CoinGecko")
+return df, last_rsi, last_macd, last_signal, decision
+
+Aplikimi për çdo coin
+
+for name, coin_id in coins.items(): st.subheader(f"{name}") df = get_price_history(coin_id) if df is None: st.warning("Nuk u ngarkuan të dhënat.") continue
+
+df_analysis, rsi, macd, signal, vendim = analyze_coin(df)
+
+# Grafiku
+st.line_chart(df.set_index("timestamp")["price"], use_container_width=True)
+
+# Tabela e analizës
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("RSI", f"{rsi:.2f}")
+col2.metric("MACD", f"{macd:.4f}")
+col3.metric("MACD Signal", f"{signal:.4f}")
+col4.metric("Vendimi", vendim)
+
+st.caption("📡 Të dhënat janë marrë nga CoinGecko dhe përditësohen çdo 5 minuta.")
+
