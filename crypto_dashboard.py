@@ -18,45 +18,37 @@ def refresh_if_needed():
         st.session_state.start_time = time.time()
         st.experimental_rerun()
 
-# Sfond me CSS dhe overlay me ngjyrë për lexueshmëri
+# CSS për sfond dhe stil profesional
 page_bg_img = '''
 <style>
 body, .stApp {
-    background-image: url("https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1470&q=80");
+    background-image: url("https://images.unsplash.com/photo-1586105251261-72a756497a12?auto=format&fit=crop&w=1950&q=80");
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
     height: 100vh;
     color: white;
-    position: relative;
 }
 
 .main {
-    position: relative;
-    z-index: 1;
-    background: rgba(0,0,0,0.55); /* overlay për lexueshmëri */
-    padding: 20px 40px;
+    background-color: rgba(0, 0, 0, 0.65);
+    padding: 20px;
     border-radius: 15px;
 }
 
-h1, h2, h3, h4, h5, h6, p {
-    color: white !important;
-}
-
-.metric-label, .metric-value {
+.metric-label, .metric-value, h1, h2, h3, p {
     color: white !important;
 }
 
 div.stMarkdown > h1, div.stMarkdown > h2 {
-    color: #00BFFF !important; /* Bluja në tituj */
+    color: #00BFFF !important;
 }
-
 </style>
 '''
 
 st.markdown(page_bg_img, unsafe_allow_html=True)
 
-# Logo me stil
+# Logo dhe titulli ARENA BUNI
 st.markdown("""
     <div style='
         display:flex;
@@ -73,7 +65,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📊 Dashboard: Çmimi, RSI dhe Ndryshimi 24h")
-
 countdown_placeholder = st.empty()
 refresh_if_needed()
 
@@ -88,7 +79,7 @@ coins = {
 
 @st.cache_data(ttl=REFRESH_INTERVAL)
 def get_market_data(coin_ids):
-    url = f"https://api.coingecko.com/api/v3/coins/markets"
+    url = "https://api.coingecko.com/api/v3/coins/markets"
     params = {
         "vs_currency": "usd",
         "ids": ",".join(coin_ids),
@@ -140,6 +131,7 @@ except Exception as e:
 
 market_data_dict = {coin["id"]: coin for coin in market_data}
 
+# Karta horizontale për çdo coin
 for name, coin_id in coins.items():
     data = market_data_dict.get(coin_id)
     if data:
@@ -154,18 +146,23 @@ for name, coin_id in coins.items():
         signal = get_signal(rsi_value)
         color = signal_color(signal)
 
-        with st.container():
+        st.markdown("---")
+        cols = st.columns([1, 1, 1, 1])
+        with cols[0]:
             st.markdown(f"### {name}")
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("💰 Çmimi (USD)", f"${price:,.6f}")
-            col2.metric("📊 Ndryshimi 24h", f"{change_24h:.2f}%")
-            col3.metric("📈 RSI (14 ditë)", f"{rsi_value}" if rsi_value is not None else "N/A")
-            col4.markdown(f"<span style='color:{color}; font-weight:bold; font-size:22px'>{signal}</span>", unsafe_allow_html=True)
+        with cols[1]:
+            st.metric("💰 Çmimi (USD)", f"${price:,.6f}")
+        with cols[2]:
+            st.metric("📊 Ndryshimi 24h", f"{change_24h:.2f}%")
+        with cols[3]:
+            st.metric("📈 RSI", f"{rsi_value}" if rsi_value else "N/A")
+            st.markdown(f"<span style='color:{color}; font-weight:bold; font-size:20px'>{signal}</span>", unsafe_allow_html=True)
     else:
         st.warning(f"Nuk u morën të dhënat për {name}.")
 
 st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL//60} minuta. Burimi: CoinGecko")
 
+# Timer automatik për rifreskim
 for i in range(seconds_remaining(), -1, -1):
     countdown_placeholder.markdown(f"⏳ Rifreskimi i ardhshëm në: **{i} sekonda**")
     time.sleep(1)
