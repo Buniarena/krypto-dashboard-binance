@@ -22,7 +22,7 @@ st.set_page_config(page_title="📊 Live Crypto Dashboard", layout="wide")
 st.title("📈 Live Crypto Dashboard (CoinGecko)")
 
 # Funksioni për marrjen e çmimeve
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=300)  # cache për 5 minuta
 def fetch_prices():
     ids = ','.join(coins.values())
     url = "https://api.coingecko.com/api/v3/simple/price"
@@ -37,25 +37,18 @@ def fetch_prices():
         return {}
     return response.json()
 
-# Funksioni për marrjen e detajeve për një coin
-@st.cache_data(ttl=300)
-def fetch_coin_details(coin_id):
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()
-    return None
-
-# Ngjyrosja e ndryshimeve
+# Funksioni për ngjyrosjen e ndryshimeve
 def highlight_changes(val):
-    try:
-        number = float(str(val).split('%')[0])
-        color = 'lightgreen' if number > 0 else 'salmon'
-        return f'background-color: {color}'
-    except:
-        return ''
+    if isinstance(val, str) and "%" in val:
+        try:
+            num = float(val.replace("%", "").split()[0])
+            color = 'lightgreen' if num > 0 else 'salmon'
+            return f'background-color: {color}'
+        except:
+            return ''
+    return ''
 
-# Paraqitja e të dhënave
+# Funksioni për shfaqjen e të dhënave me sinjale
 def display_data(data):
     rows = []
     for symbol, coingecko_id in coins.items():
@@ -64,31 +57,30 @@ def display_data(data):
             price = coin_data.get("usd")
             change = coin_data.get("usd_24h_change")
             emoji = "🟢" if change and change > 0 else "🔴"
-            comment = "📈 Rritje" if change and change > 0 else "📉 Rënie"
+
+            # Vendos sinjalin
+            if change is not None:
+                if change > 5:
+                    signal = "SHIT (fitim)"
+                elif change < -5:
+                    signal = "BLIJ (zbritje)"
+                else:
+                    signal = "MBAJ"
+            else:
+                signal = "?"
+
+            comment = f"{emoji} {'📈 Rritje' if change and change > 0 else '📉 Rënie'} • 💡 {signal}"
+
             rows.append({
-                "Coin": symbol,
+                "Symbol": symbol,
                 "Price ($)": round(price, 6),
-                "24h Change": f"{round(change, 2)}% {emoji}",
+                "24h Change (%)": f"{round(change, 2)}%",
                 "Comment": comment
             })
     df = pd.DataFrame(rows)
-    st.dataframe(df.style.applymap(highlight_changes, subset=["24h Change"]), use_container_width=True)
+    st.dataframe(df.style.applymap(highlight_changes, subset=["24h Change (%)"]), use_container_width=True)
 
-    # Klik për të zgjedhur një coin
-    selected = st.selectbox("🔎 Zgjidh një monedhë për të parë detaje:", list(coins.keys()))
-    coin_id = coins[selected]
-    coin_detail = fetch_coin_details(coin_id)
-
-    if coin_detail:
-        st.subheader(f"📘 Detaje për {selected}")
-        st.write(f"**Emri i plotë:** {coin_detail.get('name')}")
-        st.write(f"**Simboli:** {coin_detail.get('symbol').upper()}")
-        st.write(f"**Renditja në treg:** #{coin_detail.get('market_cap_rank')}")
-        st.write(f"**Website:** [{coin_detail['links']['homepage'][0]}]({coin_detail['links']['homepage'][0]})")
-        st.write("**Përshkrimi:**", coin_detail.get("description", {}).get("en", "")[:400] + "...")
-
-
-# Rifreskim çdo 15 sekonda
+# Rifreskimi çdo 15 sekonda
 if 'last_run' not in st.session_state:
     st.session_state.last_run = time.time()
 
