@@ -1,66 +1,152 @@
 import streamlit as st
-import pandas as pd
 import requests
-import time
+import pandas as pd
 from ta.momentum import RSIIndicator
+import time
 
-st.set_page_config(page_title="Live Crypto Dashboard", layout="centered")
-st.markdown("<h1 style='text-align:center; color:#60A5FA;'>📊 ARENA BUNI - Live Crypto Dashboard</h1>", unsafe_allow_html=True)
+REFRESH_INTERVAL = 180  # sekonda (3 minuta)
 
+if "start_time" not in st.session_state:
+    st.session_state.start_time = time.time()
+
+def seconds_remaining():
+    elapsed = time.time() - st.session_state.start_time
+    return max(0, int(REFRESH_INTERVAL - elapsed))
+
+def refresh_if_needed():
+    if seconds_remaining() <= 0:
+        st.session_state.start_time = time.time()
+        st.experimental_rerun()
+
+# CSS për stil më të pastër dhe elegant
+page_style = """
+<style>
+body, .stApp {
+    background-color: #0F172A;
+    color: white;
+    font-family: 'Segoe UI', sans-serif;
+}
+.block {
+    background-color: #1E293B;
+    padding: 20px;
+    border-radius: 15px;
+    margin-bottom: 20px;
+}
+.title {
+    font-size: 28px;
+    font-weight: bold;
+    color: #60A5FA;
+}
+.signal {
+    font-size: 20px;
+    font-weight: bold;
+}
+</style>
+"""
+
+st.markdown(page_style, unsafe_allow_html=True)
+
+st.title("📊 Dashboard: Çmimi, RSI dhe Ndryshimi 24h")
+
+countdown_placeholder = st.empty()
+refresh_if_needed()
+
+# Lista e kriptomonedhave
 coins = {
-    "BTC": "bitcoin",
-    "XVG": "verge",
-    "BONK": "bonk",
-    "DOGE": "dogecoin",
-    "SHIB": "shiba-inu"
+    "Bitcoin": "bitcoin",
+    "PEPE": "pepe",
+    "Doge": "dogecoin",
+    "Shiba": "shiba-inu",
+    "Bonk": "bonk",
+    "XVG (Verge)": "verge"
 }
 
-def fetch_market_data(ids):
+@st.cache_data(ttl=REFRESH_INTERVAL)
+def get_market_data(coin_ids):
     url = "https://api.coingecko.com/api/v3/coins/markets"
-    params = {"vs_currency": "usd", "ids": ",".join(ids), "price_change_percentage": "24h"}
-    resp = requests.get(url, params=params)
-    resp.raise_for_status()
-    return resp.json()
+    params = {
+        "vs_currency": "usd",
+        "ids": ",".join(coin_ids),
+        "price_change_percentage": "24h"
+    }
+    response = requests.get(url, params=params, timeout=10)
+    response.raise_for_status()
+    return response.json()
 
-def fetch_hourly_prices(coin_id):
+@st.cache_data(ttl=REFRESH_INTERVAL)
+def get_historical_prices(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-    params = {"vs_currency": "usd", "days": "1", "interval": "hourly"}
-    resp = requests.get(url, params=params)
-    resp.raise_for_status()
-    prices = resp.json()["prices"]
-    df = pd.DataFrame(prices, columns=["ts", "price"])
+    params = {
+        "vs_currency": "usd",
+        "days": "30",
+        "interval": "daily"
+    }
+    response = requests.get(url, params=params, timeout=10)
+    response.raise_for_status()
+    prices = response.json()["prices"]
+    df = pd.DataFrame(prices, columns=["timestamp", "price"])
     df["price"] = df["price"].astype(float)
     return df
 
-rows = []
+def get_signal(rsi):
+    if isinstance(rsi, float):
+        if rsi < 30:
+            return "🟢 Bli"
+        elif rsi > 70:
+            return "🔴 Shit"
+        else:
+            return "🟡 Mbaj"
+    return "❓ N/A"
+
+def signal_color(signal):
+    if "Bli" in signal:
+        return "lightgreen"
+    elif "Shit" in signal:
+        return "red"
+    elif "Mbaj" in signal:
+        return "orange"
+    return "gray"
+
 try:
-    market = fetch_market_data(list(coins.values()))
-    for coin in market:
-        symbol = coin["symbol"].upper()
-        price = coin["current_price"]
-        change24 = coin.get("price_change_percentage_24h", 0.0)
+    market_data = get_market_data(list(coins.values()))
+except Exception as e:
+    st.error(f"Gabim gjatë marrjes së të dhënave: {e}")
+    market_data = []
 
-        hist = fetch_hourly_prices(coin["id"])
-        rsi = RSIIndicator(hist["price"]).rsi().iloc[-1]
-        rsi = round(rsi,2)
+market_data_dict = {coin["id"]: coin for coin in market_data}
 
-        rows.append({
-            "Symbol": symbol,
-            "Price ($)": price,
-            "24h Change (%)": change24,
-            "RSI (24h, 14)": rsi
-        })
-except requests.exceptions.RequestException as e:
-    st.error(f"❌ Gabim API: {e}")
+for name, coin_id in coins.items():
+    data = market_data_dict.get(coin_id)
+    if data:
+        price = data["current_price"]
+        change_24h = data["price_change_percentage_24h"]
+        try:
+            hist_df = get_historical_prices(coin_id)
+            rsi = RSIIndicator(close=hist_df["price"]).rsi().iloc[-1]
+            rsi_value = round(rsi, 2)
+        except:
+            rsi_value = None
+        signal = get_signal(rsi_value)
+        color = signal_color(signal)
 
-if rows:
-    df = pd.DataFrame(rows)
-    def style_rsi(v):
-        if v < 30:
-            return "background-color:#ffcccc"
-        if v > 70:
-            return "background-color:#ccffcc"
-        return ""
-    st.dataframe(df.style.applymap(style_rsi, subset=["RSI (24h, 14)"]).set_precision(2), use_container_width=True)
+        # Layout vertikal për secilën kriptomonedhë
+        st.markdown(f"""
+            <div class='block'>
+                <div class='title'>{name}</div>
+                <p>💰 <b>Çmimi:</b> ${price:,.6f}</p>
+                <p>📊 <b>Ndryshimi 24h:</b> {change_24h:.2f}%</p>
+                <p>📈 <b>RSI:</b> {rsi_value if rsi_value else "N/A"}</p>
+                <p>💡 <b>Sinjal:</b> <span class='signal' style='color:{color}'>{signal}</span></p>
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.warning(f"Nuk u morën të dhënat për {name}.")
 
-    st.markdown("<p style='text-align:center; color:#aaa;'>💡 Të dhënat merren nga CoinGecko. RSI mes <30 (oversold), >70 (overbought).</p>", unsafe_allow_html=True)
+st.caption("🔄 Të dhënat rifreskohen automatikisht çdo 3 minuta ose me butonin manual. Burimi: CoinGecko")
+
+# Timer i thjeshtë poshtë
+for i in range(seconds_remaining(), -1, -1):
+    countdown_placeholder.markdown(f"⏳ Rifreskimi automatik në: **{i} sekonda**")
+    time.sleep(1)
+    if i == 0:
+        st.experimental_rerun()
