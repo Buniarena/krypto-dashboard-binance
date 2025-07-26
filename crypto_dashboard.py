@@ -4,7 +4,7 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 import time
 
-REFRESH_INTERVAL = 180  # 3 minuta
+REFRESH_INTERVAL = 600  # 10 minuta
 
 if "start_time" not in st.session_state:
     st.session_state.start_time = time.time()
@@ -18,7 +18,6 @@ def reset_timer():
 
 st.title("📊 Dashboard: Çmimi, RSI dhe Ndryshimi 24h")
 
-# Butoni për rifreskim manual
 if st.button("🔄 Rifresko Të Dhënat"):
     reset_timer()
     st.experimental_rerun()
@@ -88,7 +87,6 @@ except Exception as e:
 
 market_data_dict = {coin["id"]: coin for coin in market_data}
 
-# Njoftime për RSI jashtë limiteve (më poshtë 30 ose mbi 70)
 alerts = []
 
 for name, coin_id in coins.items():
@@ -121,7 +119,6 @@ for name, coin_id in coins.items():
     else:
         st.warning(f"Nuk u morën të dhënat për {name}.")
 
-# Shfaq njoftimet në krye të faqes
 if alerts:
     for alert in alerts:
         if "🔔" in alert:
@@ -131,6 +128,5 @@ if alerts:
 
 st.caption(f"🔄 Të dhënat rifreskohen automatikisht çdo {REFRESH_INTERVAL//60} minuta ose me butonin manual. Burimi: CoinGecko")
 
-# Countdown statik
 seconds_left = seconds_remaining()
 countdown_placeholder.markdown(f"⏳ Rifreskimi automatik në: **{seconds_left} sekonda**")
