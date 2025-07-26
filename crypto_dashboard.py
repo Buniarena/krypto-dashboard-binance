@@ -4,7 +4,7 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 import time
 
-REFRESH_INTERVAL = 600  # 10 minuta në sekonda
+REFRESH_INTERVAL = 180  # 180 sekonda = 3 minuta
 
 if "start_time" not in st.session_state:
     st.session_state.start_time = time.time()
@@ -34,7 +34,7 @@ coins = {
     "XVG (Verge)": "verge"
 }
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=REFRESH_INTERVAL)
 def get_prices(coin_ids):
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
@@ -45,7 +45,7 @@ def get_prices(coin_ids):
     response.raise_for_status()
     return response.json()
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=REFRESH_INTERVAL)
 def get_historical_prices(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {
@@ -106,9 +106,8 @@ for name, coin_id in coins.items():
 
 df = pd.DataFrame(rows)
 st.table(df)
-st.caption("🔄 Të dhënat rifreskohen çdo 10 minuta. Burimi: CoinGecko | RSI bazuar në çmimet ditore të 30 ditëve.")
+st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL//60} minuta. Burimi: CoinGecko | RSI bazuar në çmimet ditore të 30 ditëve.")
 
-# Loop për animacion countdown në Streamlit
 for i in range(seconds_remaining(), -1, -1):
     countdown_placeholder.markdown(f"⏳ Rifreskimi i ardhshëm në: **{i} sekonda**")
     time.sleep(1)
