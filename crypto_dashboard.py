@@ -6,14 +6,13 @@ from ta.momentum import RSIIndicator
 
 # Konfigurime
 REFRESH_INTERVAL = 180  # sekonda (3 minuta)
-REQUEST_DELAY = 1.5  # sekonda vonesë midis kërkesave për të shmangur 429
+REQUEST_DELAY = 1.5  # vonesë midis kërkesave për shmangie 429
 
 HEADER_IMAGE_URL = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80"
 
+# Lista e monedhave pa Bitcoin dhe Dogecoin
 coins = {
-    "Bitcoin": "bitcoin",
     "PEPE": "pepe",
-    "Doge": "dogecoin",
     "Shiba": "shiba-inu",
     "XVG (Verge)": "verge"
 }
@@ -28,7 +27,6 @@ def get_current_data(coin_id):
     try:
         response = requests.get(url, params=params, headers=headers, timeout=10)
         if response.status_code == 429:
-            # Kthejmë një mesazh specifik për kufizim
             return {"error": "429"}
         response.raise_for_status()
         return response.json()[0]
@@ -42,7 +40,7 @@ def get_historical_prices(coin_id):
     try:
         response = requests.get(url, params=params, headers=headers, timeout=10)
         if response.status_code == 429:
-            return pd.DataFrame()  # Kthe bosh për 429
+            return pd.DataFrame()
         response.raise_for_status()
         prices = response.json().get("prices", [])
         df = pd.DataFrame(prices, columns=["timestamp", "price"])
@@ -125,7 +123,6 @@ for idx, (name, coin_id) in enumerate(coins.items()):
 
     data = get_current_data(coin_id)
 
-    # Nëse po marrim error 429 nga API
     if data == {"error": "429"}:
         st.warning(f"Kufizim API (429) për '{coin_id}'. Nuk mund të marrim të dhëna aktuale.")
         continue
@@ -133,7 +130,6 @@ for idx, (name, coin_id) in enumerate(coins.items()):
         st.warning(f"Gabim gjatë marrjes së të dhënave për '{coin_id}'.")
         continue
 
-    # Vonesë për të shmangur kërkesat shumë të shpeshta
     if idx < len(coins) - 1:
         time.sleep(REQUEST_DELAY)
 
