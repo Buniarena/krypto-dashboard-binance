@@ -37,14 +37,32 @@ def fetch_prices():
         return {}
     return response.json()
 
-# Funksioni për ngjyrosjen e rreshtave
+# Funksioni për marrjen e të dhënave historike për një coin të vetëm
+@st.cache_data(ttl=300)
+def fetch_coin_details(coin_id):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+    params = {
+        'vs_currency': 'usd',
+        'days': '7',
+        'interval': 'daily'
+    }
+    response = requests.get(url, params=params)
+    if response.status_code != 200:
+        return None
+    return response.json()
+
+# Funksioni për ngjyrosjen e ndryshimeve
 def highlight_changes(val):
-    if isinstance(val, (float, int)):
-        color = 'lightgreen' if val > 0 else 'salmon'
-        return f'background-color: {color}'
+    if isinstance(val, str) and "%" in val:
+        try:
+            number = float(val.replace('% 🔴','').replace('% 🟢','').strip())
+            color = 'lightgreen' if number > 0 else 'salmon'
+            return f'background-color: {color}'
+        except:
+            return ''
     return ''
 
-# Funksioni për shfaqjen e të dhënave
+# Shfaqja e tabelës
 def display_data(data):
     rows = []
     for symbol, coingecko_id in coins.items():
@@ -71,10 +89,14 @@ if time.time() - st.session_state.last_run > 15:
     st.session_state.last_run = time.time()
     st.rerun()
 
+# Marrja e çmimeve
 data = fetch_prices()
+
 if data:
     display_data(data)
-else:
-    st.warning("⚠️ Të dhënat nuk janë të disponueshme tani.")
+    st.divider()
 
-st.caption("📡 Marrë nga CoinGecko • Rifreskim automatik çdo 15 sekonda")
+    # Përzgjedhja e një coini për detaje
+    coin_name = st.selectbox("🔍 Zgjidh një kriptomonedhë për më shumë detaje", list(coins.keys()))
+    coin_id = coins[coin_name]
+    coin_detail = fetch_coin_details(coin
