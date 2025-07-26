@@ -5,53 +5,57 @@ from ta.momentum import RSIIndicator
 from ta.trend import SMAIndicator
 import time
 
-# Konfigurimi i faqes
 st.set_page_config(page_title="Paneli i Kriptovalutave", layout="wide")
-st.title("📈 Çmimet & RSI / MA për BTC, ETH & XRP")
+st.title("📈 Çmimet dhe RSI / MA për BTC, ETH & XRP")
 
-# Marrja e të dhënave me cache 5 minuta
 @st.cache_data(ttl=300)
-def merr_te_dhena(emri_monedit):
-    url = f"https://api.coingecko.com/api/v3/coins/{emri_monedit}/market_chart"
-    params = {"vs_currency": "usd", "days": "1", "interval": "minute"}
-    headers = {"User-Agent": "Mozilla/5.0"}
-    pergjigje = requests.get(url, params=params, headers=headers)
-    pergjigje.raise_for_status()
-    cmimet = pergjigje.json()["prices"]
-    df = pd.DataFrame(cmimet, columns=["koha", "cmimi"])
-    df["koha"] = pd.to_datetime(df["koha"], unit="ms")
-    df.set_index("koha", inplace=True)
-    return df
-
-# Funksioni për analizë të monedhës
-def analiz_monede(emri_shfaqur, emri_api):
-    st.subheader(emri_shfaqur)
+def merr_te_dhena(coin_id):
     try:
-        df = merr_te_dhena(emri_api)
-        cmimi = df["cmimi"].iloc[-1]
-        rsi = RSIIndicator(df["cmimi"]).rsi().iloc[-1]
-        ma = SMAIndicator(df["cmimi"], window=20).sma_indicator().iloc[-1]
+        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+        params = {
+            "vs_currency": "usd",
+            "days": "1",
+            "interval": "minute"
+        }
+        r = requests.get(url, params=params)
+        r.raise_for_status()
+        data = r.json()["prices"]
+        df = pd.DataFrame(data, columns=["koha", "cmimi"])
+        df["koha"] = pd.to_datetime(df["koha"], unit="ms")
+        df.set_index("koha", inplace=True)
+        return df
+    except:
+        return None
 
-        kol1, kol2, kol3 = st.columns(3)
-        kol1.metric("💰 Çmimi", f"${cmimi:,.2f}")
-        kol2.metric("📊 RSI", f"{rsi:.2f}")
-        kol3.metric("📉 Mesatare Lëvizëse (20)", f"${ma:,.2f}")
+def analiz_monede(emri_shfaqur, coin_id):
+    st.subheader(emri_shfaqur)
+    df = merr_te_dhena(coin_id)
+    if df is None or df.empty:
+        st.error(f"Nuk u morën të dhëna për {emri_shfaqur}")
+        return
 
-        if rsi > 70:
-            st.warning("⚠️ RSI: MBIBLEBLER")
-        elif rsi < 30:
-            st.success("✅ RSI: NËNÇMIM")
-        else:
-            st.info("ℹ️ RSI: NEUTRAL")
+    cmimi = df["cmimi"].iloc[-1]
+    rsi = RSIIndicator(df["cmimi"]).rsi().iloc[-1]
+    ma = SMAIndicator(df["cmimi"], window=20).sma_indicator().iloc[-1]
 
-        st.line_chart(df["cmimi"])
-    except Exception as e:
-        st.error(f"Nuk u morën të dhëna për {emri_shfaqur}: {e}")
+    kol1, kol2, kol3 = st.columns(3)
+    kol1.metric("💰 Çmimi", f"${cmimi:,.2f}")
+    kol2.metric("📊 RSI", f"{rsi:.2f}")
+    kol3.metric("📉 MA (20)", f"${ma:,.2f}")
 
-# Thirrja për çdo kriptomonedhë
-analiz_monede("Bitcoin", "bitcoin")
-analiz_monede("Ethereum", "ethereum")
-analiz_monede("XRP", "ripple")
+    if rsi > 70:
+        st.warning("⚠️ RSI: Mbiblerje")
+    elif rsi < 30:
+        st.success("✅ RSI: Nënçmim")
+    else:
+        st.info("ℹ️ RSI: Neutral")
+
+    st.line_chart(df["cmimi"])
+
+# Thirrja për analizë të tre kriptove
+analiz_monede("Bitcoin (BTC)", "bitcoin")
+analiz_monede("Ethereum (ETH)", "ethereum")
+analiz_monede("Ripple (XRP)", "ripple")
 
 st.caption("⏱️ Rifreskim automatik çdo 15 sekonda. Cache: 5 minuta.")
 time.sleep(15)
