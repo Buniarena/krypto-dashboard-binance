@@ -3,16 +3,12 @@ import requests
 import pandas as pd
 from ta.momentum import RSIIndicator
 
-# Rifreskim automatik çdo 10 minuta (600000 ms)
-st.experimental_autorefresh(interval=600000, key="datarefresh")
-
 coins = {
     "Bitcoin": "bitcoin",
     "PEPE": "pepe",
     "Doge": "dogecoin",
     "Shiba": "shiba-inu",
-    "Bonk": "bonk",
-    "XVG (Verge)": "verge"
+    "Bonk": "bonk"
 }
 
 st.title("📊 Çmimi Aktual, RSI dhe Sinjali për Coinet")
@@ -33,7 +29,7 @@ def get_historical_prices(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {
         "vs_currency": "usd",
-        "days": "30",
+        "days": "30",  # 30 ditë historik
         "interval": "daily"
     }
     response = requests.get(url, params=params, timeout=10)
