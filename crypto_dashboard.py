@@ -81,6 +81,15 @@ def signal_color(signal):
     else:
         return "gray"
 
+def play_alert_sound():
+    # Luaj zilen (mund ta zëvendësosh me ndonjë tjetër URL tingulli)
+    st.components.v1.html("""
+    <audio autoplay>
+      <source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" type="audio/ogg">
+      Your browser does not support the audio element.
+    </audio>
+    """, height=0)
+
 try:
     current_prices = get_prices(list(coins.values()))
 except requests.exceptions.RequestException as e:
@@ -98,10 +107,12 @@ for name, coin_id in coins.items():
     
     signal = get_signal(rsi_value)
 
-    # Kolona për sinjal me ngjyrë dhe font bold
+    # Nëse RSI është nën 30 ose mbi 70, luaj zilen
+    if isinstance(rsi_value, float) and (rsi_value < 30 or rsi_value > 70):
+        play_alert_sound()
+
     signal_html = f'<span style="color:{signal_color(signal)}; font-weight: bold;">{signal}</span>'
 
-    # Shfaqim secilin coin në kolonë të veçantë me metric për çmim dhe RSI
     with st.container():
         st.markdown(f"### {name}")
         if price is not None:
