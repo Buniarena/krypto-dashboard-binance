@@ -2,38 +2,42 @@ import streamlit as st
 import requests
 import pandas as pd
 
-# Emrat e coineve dhe simbolat në Binance (USDT market)
 coins = {
-    "Bitcoin": "BTCUSDT",
-    "PEPE": "PEPEUSDT",
-    "Doge": "DOGEUSDT",
-    "Shiba": "SHIBUSDT",
-    "Bonk": "BONKUSDT"
+    "Bitcoin": "bitcoin",
+    "PEPE": "pepe",
+    "Doge": "dogecoin",
+    "Shiba": "shiba-inu",
+    "Bonk": "bonk"
 }
 
-st.set_page_config(page_title="📊 Çmimi Aktual për Coinet (Binance API)", layout="centered")
-st.title("📊 Çmimi Aktual për Coinet (Binance API)")
+st.title("📊 Çmimi Aktual për Coinet (CoinGecko me Cache)")
 
-def get_binance_price(symbol):
-    url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-    try:
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-        price = float(response.json().get("price", 0))
-        return price
-    except Exception as e:
-        st.write(f"⚠️ Gabim te {symbol}: {e}")
-        return None
+@st.cache_data(ttl=600)  # ruaj për 10 minuta për të shmangur limitet
+def get_prices(coin_ids):
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    params = {
+        "ids": ",".join(coin_ids),
+        "vs_currencies": "usd"
+    }
+    response = requests.get(url, params=params, timeout=10)
+    response.raise_for_status()
+    return response.json()
 
-data = []
-for name, symbol in coins.items():
-    price = get_binance_price(symbol)
+try:
+    data = get_prices(list(coins.values()))
+except Exception as e:
+    st.error(f"Gabim API: {e}")
+    data = {}
+
+rows = []
+for name, coin_id in coins.items():
+    price = data.get(coin_id, {}).get("usd", None)
     if price is not None:
-        data.append({"Coin": name, "Çmimi aktual (USD)": f"${price:.6f}"})
+        rows.append({"Coin": name, "Çmimi aktual (USD)": f"${price}"})
     else:
-        data.append({"Coin": name, "Çmimi aktual (USD)": "Nuk u morën të dhënat"})
+        rows.append({"Coin": name, "Çmimi aktual (USD)": "Nuk u morën të dhënat"})
 
-df = pd.DataFrame(data)
+df = pd.DataFrame(rows)
 st.table(df)
 
-st.caption("🔄 Të dhënat rifreskohen çdo herë që hap aplikacionin. Burimi: Binance API")
+st.caption("🔄 Të dhënat rifreskohen çdo 10 minuta. Burimi: CoinGecko")
