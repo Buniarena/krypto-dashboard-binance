@@ -8,6 +8,8 @@ REFRESH_INTERVAL = 180  # 180 sekonda = 3 minuta
 
 if "start_time" not in st.session_state:
     st.session_state.start_time = time.time()
+if "last_signal" not in st.session_state:
+    st.session_state.last_signal = {}
 
 def seconds_remaining():
     elapsed = time.time() - st.session_state.start_time
@@ -81,11 +83,17 @@ def signal_color(signal):
     else:
         return "gray"
 
-def play_alert_sound():
-    # Luaj zilen (mund ta zëvendësosh me ndonjë tjetër URL tingulli)
-    st.components.v1.html("""
+def play_alert_sound(signal):
+    if signal == "🟢 Bli":
+        sound_url = "https://actions.google.com/sounds/v1/alarms/bugle_tune.ogg"
+    elif signal == "🔴 Shit":
+        sound_url = "https://actions.google.com/sounds/v1/alarms/beep_short.ogg"
+    else:
+        return  # pa tingull për "Mbaj" ose "N/A"
+
+    st.components.v1.html(f"""
     <audio autoplay>
-      <source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" type="audio/ogg">
+      <source src="{sound_url}" type="audio/ogg">
       Your browser does not support the audio element.
     </audio>
     """, height=0)
@@ -107,9 +115,11 @@ for name, coin_id in coins.items():
     
     signal = get_signal(rsi_value)
 
-    # Nëse RSI është nën 30 ose mbi 70, luaj zilen
-    if isinstance(rsi_value, float) and (rsi_value < 30 or rsi_value > 70):
-        play_alert_sound()
+    # Luaj tingull vetëm nëse sinjali ndryshon për këtë coin
+    if (isinstance(rsi_value, float) and (rsi_value < 30 or rsi_value > 70)):
+        if st.session_state.last_signal.get(name) != signal:
+            play_alert_sound(signal)
+            st.session_state.last_signal[name] = signal
 
     signal_html = f'<span style="color:{signal_color(signal)}; font-weight: bold;">{signal}</span>'
 
