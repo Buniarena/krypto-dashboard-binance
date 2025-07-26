@@ -56,19 +56,12 @@ st.title("📊 Dashboard: RSI, MACD, Çmimi dhe Sinjale")
 countdown_placeholder = st.empty()
 refresh_if_needed()
 
-# Kufizo listën (mund ta zgjerosh gradualisht për test)
 coins = {
     "Bitcoin": "bitcoin",
     "PEPE": "pepe",
     "Doge": "dogecoin",
     "Shiba": "shiba-inu",
-    "Bonk": "bonk",
-    # "XVG (Verge)": "verge",
-    # "WIN": "wink",
-    # "SLP": "smooth-love-potion",
-    # "DENT": "dent",
-    # "SPELL": "spell-token",
-    # "PEOPLE": "constitutiondao"
+    "XVG (Verge)": "verge",
 }
 
 @st.cache_data(ttl=REFRESH_INTERVAL)
@@ -131,9 +124,8 @@ for idx, (name, coin_id) in enumerate(coins.items()):
         price = data["current_price"]
         change_24h = data["price_change_percentage_24h"]
         try:
-            # Delay 1 sekondë midis kërkesave për të shmangur 429 errors
             if idx != 0:
-                time.sleep(1)
+                time.sleep(1)  # Delay për shmangien e 429 errors
 
             hist_df = get_historical_prices(coin_id)
             rsi = RSIIndicator(close=hist_df["price"]).rsi().iloc[-1]
