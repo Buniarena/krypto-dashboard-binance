@@ -4,7 +4,7 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 import time
 
-REFRESH_INTERVAL = 10  # 10 sekonda
+REFRESH_INTERVAL = 180  # 3 minuta (mund ta ndryshosh sipas dëshirës)
 
 if "start_time" not in st.session_state:
     st.session_state.start_time = time.time()
@@ -45,13 +45,14 @@ def get_prices(coin_ids):
     response.raise_for_status()
     return response.json()
 
+# Merr çmimet historike me interval 1 ore për 1 ditë (24 orë)
 @st.cache_data(ttl=REFRESH_INTERVAL)
-def get_historical_prices(coin_id):
+def get_hourly_prices_1day(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {
         "vs_currency": "usd",
-        "days": "30",
-        "interval": "daily"
+        "days": "1",
+        "interval": "hourly"
     }
     response = requests.get(url, params=params, timeout=10)
     response.raise_for_status()
@@ -81,7 +82,7 @@ rows = []
 for name, coin_id in coins.items():
     price = current_prices.get(coin_id, {}).get("usd")
     try:
-        hist_df = get_historical_prices(coin_id)
+        hist_df = get_hourly_prices_1day(coin_id)
         rsi = RSIIndicator(close=hist_df["price"]).rsi().iloc[-1]
         rsi_value = round(rsi, 2)
     except Exception:
@@ -93,21 +94,21 @@ for name, coin_id in coins.items():
         rows.append({
             "Coin": name,
             "Çmimi aktual (USD)": f"${price}",
-            "RSI (14 ditë)": rsi_value,
+            "RSI (1 orë, 1 ditë)": rsi_value,
             "Sinjali": signal
         })
     else:
         rows.append({
             "Coin": name,
             "Çmimi aktual (USD)": "Nuk u morën të dhënat",
-            "RSI (14 ditë)": rsi_value,
+            "RSI (1 orë, 1 ditë)": rsi_value,
             "Sinjali": signal
         })
 
 df = pd.DataFrame(rows)
 st.table(df)
-st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL} sekonda. Burimi: CoinGecko | RSI bazuar në çmimet ditore të 30 ditëve.")
-
+st.caption(f"🔄 Të dhënat rifreskohen çdo {REFRESH_INTERVAL} sekonda. Burimi: CoinGecko | RSI bazuar në çmimet orare të 1 ditës.")
+        
 for i in range(seconds_remaining(), -1, -1):
     countdown_placeholder.markdown(f"⏳ Rifreskimi i ardhshëm në: **{i} sekonda**")
     time.sleep(1)
