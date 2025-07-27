@@ -1,0 +1,63 @@
+import streamlit as st
+import requests
+import pandas as pd
+from ta.momentum import RSIIndicator
+
+# Merr API Key nga secrets
+API_KEY = st.secrets["COINGECKO_API_KEY"]
+
+# Funksioni për të marrë të dhënat historike të monedhës
+def get_coin_data(coin_id):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+    headers = {
+        "accept": "application/json",
+        "x-cg-api-key": API_KEY
+    }
+    params = {
+        "vs_currency": "usd",
+        "days": "7",
+        "interval": "hourly"
+    }
+    response = requests.get(url, headers=headers, params=params)
+    if response.status_code == 200:
+        data = response.json()
+        prices = data["prices"]
+        df = pd.DataFrame(prices, columns=["timestamp", "price"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
+        df.set_index("timestamp", inplace=True)
+        return df
+    else:
+        st.error(f"Gabim {response.status_code}: Nuk u morën të dhënat.")
+        return None
+
+# Vizualizimi i çmimit dhe RSI
+def show_dashboard(coin_id, coin_name):
+    st.title(f"{coin_name} 📊 RSI & Çmimi")
+    
+    df = get_coin_data(coin_id)
+    if df is not None:
+        # Llogarit RSI
+        rsi = RSIIndicator(close=df["price"]).rsi()
+        df["RSI"] = rsi
+        
+        # Shfaq grafikët
+        st.subheader("📈 Grafiku i Çmimit")
+        st.line_chart(df["price"])
+
+        st.subheader("📉 RSI (Relative Strength Index)")
+        st.line_chart(df["RSI"])
+
+        # Shfaq çmimin e fundit
+        latest_price = df["price"].iloc[-1]
+        latest_rsi = df["RSI"].iloc[-1]
+        st.metric("Çmimi i fundit", f"${latest_price:,.2f}")
+        st.metric("RSI i fundit", f"{latest_rsi:.2f}")
+
+# Zgjedhje nga përdoruesi
+coin_map = {
+    "Bitcoin": "bitcoin",
+    "Ethereum": "ethereum",
+    "XRP": "ripple"
+}
+coin_name = st.selectbox("🪙 Zgjidh monedhën", list(coin_map.keys()))
+show_dashboard(coin_map[coin_name], coin_name)
