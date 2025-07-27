@@ -1,0 +1,73 @@
+import streamlit as st
+import requests
+import pandas as pd
+from ta.momentum import RSIIndicator
+
+# Merr API Key nga secrets
+API_KEY = st.secrets["COINGECKO_API_KEY"]
+
+# Funksioni për të marrë të dhënat historike
+def get_coin_data(coin_id):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+    headers = {
+        "accept": "application/json",
+        "x-cg-api-key": API_KEY
+    }
+    params = {
+        "vs_currency": "usd",
+        "days": "7",
+        "interval": "hourly"
+    }
+    response = requests.get(url, headers=headers, params=params)
+    if response.status_code == 200:
+        data = response.json()
+        prices = data["prices"]
+        df = pd.DataFrame(prices, columns=["timestamp", "price"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
+        df.set_index("timestamp", inplace=True)
+        return df
+    else:
+        st.error(f"Gabim {response.status_code}: Nuk u morën të dhënat.")
+        return None
+
+# Funksioni për dashboardin
+def show_dashboard(coin_id, coin_name):
+    st.title(f"{coin_name} 📊 RSI & Çmimi")
+
+    df = get_coin_data(coin_id)
+    if df is not None:
+        df["RSI"] = RSIIndicator(close=df["price"]).rsi()
+
+        # Shfaq grafikun e çmimit
+        st.subheader("📈 Çmimi")
+        st.line_chart(df["price"])
+
+        # Shfaq grafikun e RSI
+        st.subheader("📉 RSI")
+        st.line_chart(df["RSI"])
+
+        # Sinjal RSI
+        latest_rsi = df["RSI"].iloc[-1]
+        if latest_rsi > 70:
+            st.warning(f"RSI: {latest_rsi:.2f} → **Overbought**! Mund të bie.")
+        elif latest_rsi < 30:
+            st.success(f"RSI: {latest_rsi:.2f} → **Oversold**! Mund të rritet.")
+        else:
+            st.info(f"RSI: {latest_rsi:.2f} → **Neutral**.")
+
+        # Çmimi i fundit
+        latest_price = df["price"].iloc[-1]
+        st.metric("Çmimi i fundit", f"${latest_price:,.2f}")
+
+# Zgjedhja e monedhës
+coin_map = {
+    "Bitcoin (BTC)": "bitcoin",
+    "Ethereum (ETH)": "ethereum",
+    "XRP": "ripple",
+    "PEPE": "pepe",
+    "Shiba Inu": "shiba-inu",
+    "XVG (Verge)": "verge"
+}
+
+coin_name = st.selectbox("🪙 Zgjidh monedhën", list(coin_map.keys()))
+show_dashboard(coin_map[coin_name], coin_name)
