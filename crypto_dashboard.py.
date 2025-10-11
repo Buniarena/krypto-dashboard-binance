@@ -1,0 +1,225 @@
+# crypto_dashboard.py
+import streamlit as st
+import requests
+import pandas as pd
+import time
+import numpy as np
+from io import BytesIO
+from ta.momentum import RSIIndicator
+import streamlit.components.v1 as components
+
+# -------------------- Konfigurime --------------------
+REFRESH_INTERVAL = 180      # sekonda (3 min)
+REQUEST_DELAY = 1.5
+HEADER_IMAGE_URL = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80"
+
+# Monedhat
+coins = {
+    "PEPE": "pepe",
+    "Shiba": "shiba-inu",
+    "XVG (Verge)": "verge",
+}
+
+# -------------------- Ndihmëse --------------------
+@st.cache_data(ttl=REFRESH_INTERVAL)
+def get_current_data(coin_id: str):
+    url = "https://api.coingecko.com/api/v3/coins/markets"
+    params = {"vs_currency": "usd", "ids": coin_id}
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        if r.status_code == 429:
+            return {"error": "429"}
+        r.raise_for_status()
+        data = r.json()
+        return data[0] if data else None
+    except Exception:
+        return None
+
+@st.cache_data(ttl=REFRESH_INTERVAL)
+def get_historical_prices(coin_id: str) -> pd.DataFrame:
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+    params = {"vs_currency": "usd", "days": "60", "interval": "daily"}
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        if r.status_code == 429:
+            return pd.DataFrame()
+        r.raise_for_status()
+        prices = r.json().get("prices", [])
+        df = pd.DataFrame(prices, columns=["timestamp", "price"])
+        df["price"] = df["price"].astype(float)
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+def calc_rsi(df: pd.DataFrame):
+    if df.empty or len(df) < 14:
+        return None
+    try:
+        return round(RSIIndicator(close=df["price"]).rsi().iloc[-1], 2)
+    except Exception:
+        return None
+
+def beep(duration_ms=350, freq=880, sr=44100):
+    t = np.linspace(0, duration_ms/1000.0, int(sr*duration_ms/1000.0), False)
+    tone = (0.5*np.sin(2*np.pi*freq*t)).astype(np.float32)
+    import wave
+    buf = BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes((tone*32767).astype(np.int16).tobytes())
+    buf.seek(0)
+    return buf.read()
+
+def browser_notify(title, body):
+    components.html(f"""
+    <script>
+    (async () => {{
+      try {{
+        if (!("Notification" in window)) return;
+        if (Notification.permission !== "granted") {{
+          await Notification.requestPermission();
+        }}
+        if (Notification.permission === "granted") {{
+          new Notification("{title.replace('"','\\\"')}", {{ body: "{body.replace('"','\\\"')}" }});
+        }}
+      }} catch (e) {{}}
+    }})();
+    </script>
+    """, height=0)
+
+def nice_price(p):
+    if isinstance(p, float) and p < 1:
+        return f"${p:,.8f}"
+    return f"${p:,.2f}"
+
+# -------------------- Header --------------------
+st.markdown(f"""
+<style>
+.header-image {{
+  position: relative; width: 100%; height: 180px;
+  background-image: url('{HEADER_IMAGE_URL}');
+  background-size: cover; background-position: center;
+  border-radius: 10px; margin-bottom: 25px;
+}}
+.header-text {{
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  color: white; font-size: 4rem; font-weight: 900;
+  text-shadow: 2px 2px 10px rgba(0,0,0,0.7); letter-spacing: 8px;
+}}
+</style>
+<div class="header-image"><div class="header-text">Crypto Alerts</div></div>
+""", unsafe_allow_html=True)
+
+# -------------------- Sidebar (kontrolli i alarmeve) --------------------
+st.sidebar.header("🔔 Alarme")
+enable_alerts = st.sidebar.toggle("Aktivo alarmet", value=True)
+sound_on = st.sidebar.toggle("Tingull (beep)", value=True, disabled=not enable_alerts)
+browser_on = st.sidebar.toggle("Njoftim i shfletuesit", value=True, disabled=not enable_alerts)
+st.sidebar.divider()
+st.sidebar.subheader("RSI Thresholds")
+rsi_buy = st.sidebar.number_input("RSI Bli (<)", 10, 50, 30)
+rsi_sell = st.sidebar.number_input("RSI Shit (>)", 50, 90, 70)
+st.sidebar.subheader("Price Thresholds (PEPE)")
+upper_price = st.sidebar.number_input("Alarm kur kalon SIPËR", value=0.00716, step=0.00001, format="%.8f")
+lower_price = st.sidebar.number_input("Alarm kur bie POSHTË", value=0.00700, step=0.00001, format="%.8f")
+st.sidebar.caption("Zilja ndizet vetëm kur ndodh KALIMI (cross) i pragut, jo çdo refresh.")
+
+# gjendje
+if "start_time" not in st.session_state:
+    st.session_state.start_time = time.time()
+if "last_signals" not in st.session_state:
+    st.session_state.last_signals = {}           # per RSI
+if "last_price_state" not in st.session_state:
+    st.session_state.last_price_state = None     # per PEPE price (above/below/mid)
+
+def seconds_remaining():
+    elapsed = time.time() - st.session_state.start_time
+    return max(0, int(REFRESH_INTERVAL - elapsed))
+
+def refresh_if_needed():
+    if seconds_remaining() <= 0:
+        st.session_state.start_time = time.time()
+
+# -------------------- UI kryesor --------------------
+st.title("📊 Dashboard: RSI, Çmimi dhe Sinjale me Zile")
+st.caption(f"⏳ Rifreskimi automatik në: {seconds_remaining()} sekonda")
+refresh_if_needed()
+
+for idx, (name, coin_id) in enumerate(coins.items()):
+    st.subheader(name)
+    data = get_current_data(coin_id)
+
+    if data == {"error": "429"}:
+        st.warning(f"Kufizim API (429) për '{coin_id}'.")
+        continue
+    if data is None:
+        st.warning(f"Gabim gjatë marrjes së të dhënave për '{coin_id}'.")
+        continue
+
+    if idx < len(coins) - 1:
+        time.sleep(REQUEST_DELAY)
+
+    # RSI
+    hist = get_historical_prices(coin_id)
+    rsi = calc_rsi(hist)
+    # sinjal RSI
+    if rsi is None:
+        signal = "❓ N/A"
+    elif rsi < rsi_buy:
+        signal = "🟢 Bli"
+    elif rsi > rsi_sell:
+        signal = "🔴 Shit"
+    else:
+        signal = "🟡 Mbaj"
+
+    price = data.get("current_price", None)
+    change_24h = data.get("price_change_percentage_24h", None)
+
+    st.markdown(
+        f"💰 **Çmimi:** {nice_price(price) if price is not None else 'N/A'}  \n"
+        f"📊 **Ndryshimi 24h:** {change_24h:.2f}%  \n"
+        f"📈 **RSI:** {rsi if rsi is not None else 'N/A'}  \n"
+        f"💡 **Sinjal:** {signal}"
+    )
+
+    # -------------------- Alarme RSI --------------------
+    if enable_alerts and signal in ("🟢 Bli", "🔴 Shit"):
+        key = f"rsi:{coin_id}"
+        if st.session_state.last_signals.get(key) != signal:
+            msg = f"{name} — {signal} | RSI={rsi} | Çmimi={nice_price(price)}"
+            st.toast(f"🔔 {msg}")
+            if sound_on:
+                st.audio(beep(), format="audio/wav", autoplay=True)
+            if browser_on:
+                browser_notify("RSI Alert", msg)
+            st.session_state.last_signals[key] = signal
+
+    # -------------------- Alarme PRICE (vetëm PEPE) --------------------
+    if enable_alerts and coin_id == "pepe" and isinstance(price, float):
+        # gjendja aktuale kundrejt pragjeve
+        if price >= upper_price:
+            state = "above"
+        elif price <= lower_price:
+            state = "below"
+        else:
+            state = "mid"
+
+        last = st.session_state.last_price_state
+        crossed_up = (last in (None, "mid", "below")) and state == "above"
+        crossed_down = (last in (None, "mid", "above")) and state == "below"
+
+        if crossed_up or crossed_down:
+            direction = "sipër" if crossed_up else "poshtë"
+            msg = f"PEPE kaloi {direction} pragut – Çmimi: {nice_price(price)}"
+            st.toast(f"🔔 {msg}")
+            if sound_on:
+                st.audio(beep(), format="audio/wav", autoplay=True)
+            if browser_on:
+                browser_notify("Price Alert", msg)
+
+        st.session_state.last_price_state = state
+
+st.info("🔄 Rifreskohet çdo 3 min. Alarmi ndizet kur ndodh KALIM i pragut RSI/Çmimi, jo çdo refresh.")
