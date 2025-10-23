@@ -77,7 +77,7 @@ def calculate_bollinger_bands(prices, window=20, num_std=2):
     lower = sma - (std * num_std)
     return sma, upper, lower
 
-st.image(HEADER_IMAGE_URL, use_column_width="always")
+st.image(HEADER_IMAGE_URL, use_container_width=True)
 st.title("Analizë Kriptovalutash: RSI, EMA, MACD (me Sinjale më të Forta), Bollinger Bands dhe Sinjale")
 
 selected_coin = st.selectbox("Zgjidh monedhën", list(coins.keys()))
