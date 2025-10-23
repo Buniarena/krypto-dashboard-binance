@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import numpy as np
 
 AUDIO_URL = "https://actions.google.com/sounds/v1/alarms/beep_short.ogg"
 REFRESH_INTERVAL = 180
@@ -46,27 +47,16 @@ def get_historical_prices(coin_id, days=90):
         return pd.DataFrame()
 
 def calculate_rsi(prices, period=14):
-    if prices is None or len(prices) < period + 1:
-        return pd.Series([None] * len(prices), index=prices.index if hasattr(prices, "index") else None)
-    delta = prices.diff().fillna(0)
-    gain = delta.where(delta > 0, 0)
-    loss = (-delta).where(delta < 0, 0)
-    initial_gain = gain.iloc[:period].mean()
-    initial_loss = loss.iloc[:period].mean()
-    avg_gain = pd.Series(index=prices.index, dtype=float)
-    avg_loss = pd.Series(index=prices.index, dtype=float)
-    avg_gain.iloc[period-1] = initial_gain
-    avg_loss.iloc[period-1] = initial_loss
-    for i in range(period, len(prices)):
-        gain_i = gain.iloc[i]
-        loss_i = loss.iloc[i]
-        prev_gain = avg_gain.iloc[i-1]
-        prev_loss = avg_loss.iloc[i-1]
-        avg_gain.iloc[i] = (prev_gain * (period - 1) + gain_i) / period
-        avg_loss.iloc[i] = (prev_loss * (period - 1) + loss_i) / period
+    if len(prices) < period + 1:
+        return pd.Series(np.nan, index=prices.index)
+    delta = prices.diff()
+    gain = delta.where(delta > 0, 0).fillna(0)
+    loss = (-delta.where(delta < 0, 0)).fillna(0)
+    avg_gain = gain.ewm(alpha=1/period, min_periods=period, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1/period, min_periods=period, adjust=False).mean()
     rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
-    rsi[:period-1] = None
+    rsi = 100 - 100 / (1 + rs)
+    rsi.iloc[:period-1] = np.nan
     return rsi
 
 def calculate_ema(prices, span):
@@ -117,83 +107,74 @@ else:
     historical_prices['timestamp'] = pd.to_datetime(historical_prices['timestamp'], unit='ms')
     historical_prices.set_index('timestamp', inplace=True)
 
-    # Llogarit indikatorët
-    historical_prices["rsi"] = calculate_rsi(historical_prices["price"])
-    historical_prices["ema12"] = calculate_ema(historical_prices["price"], 12)
-    historical_prices["ema26"] = calculate_ema(historical_prices["price"], 26)
-    historical_prices["macd"], historical_prices["macd_signal"], historical_prices["macd_histogram"] = calculate_macd(historical_prices["price"])
-    historical_prices["sma20"], historical_prices["bollinger_upper"], historical_prices["bollinger_lower"] = calculate_bollinger_bands(historical_prices["price"])
+    # Llogarit indikatorët (të gjitha vektoriale)
+    prices = historical_prices["price"]
+    historical_prices["rsi"] = calculate_rsi(prices)
+    historical_prices["ema12"] = calculate_ema(prices, 12)
+    historical_prices["ema26"] = calculate_ema(prices, 26)
+    historical_prices["macd"], historical_prices["macd_signal"], historical_prices["macd_histogram"] = calculate_macd(prices)
+    historical_prices["sma20"], historical_prices["bollinger_upper"], historical_prices["bollinger_lower"] = calculate_bollinger_bands(prices)
 
-    # Gjenero sinjale bazuar në RSI, EMA crossover, MACD crossover (me peshë më të lartë), dhe Bollinger
-    def generate_signals(df):
-        signals = []
-        for i in range(len(df)):
-            rsi = df["rsi"].iloc[i]
-            ema12 = df["ema12"].iloc[i]
-            ema26 = df["ema26"].iloc[i]
-            macd = df["macd"].iloc[i]
-            macd_signal = df["macd_signal"].iloc[i]
-            price = df["price"].iloc[i]
-            upper = df["bollinger_upper"].iloc[i]
-            lower = df["bollinger_lower"].iloc[i]
-            histogram = df["macd_histogram"].iloc[i]
+    # Gjenero sinjale në mënyrë vektoriale
+    rsi = historical_prices["rsi"]
+    ema12 = historical_prices["ema12"]
+    ema26 = historical_prices["ema26"]
+    macd = historical_prices["macd"]
+    macd_signal = historical_prices["macd_signal"]
+    histogram = historical_prices["macd_histogram"]
+    price = historical_prices["price"]
+    upper = historical_prices["bollinger_upper"]
+    lower = historical_prices["bollinger_lower"]
 
-            signal = 0
-            if pd.isna(rsi) or pd.isna(ema12) or pd.isna(macd) or pd.isna(upper):
-                signals.append(0)
-                continue
+    # Mask për të shmangur NaN
+    valid = rsi.notna() & ema12.notna() & macd.notna() & upper.notna()
 
-            # RSI sinjal
-            if rsi < 30:
-                signal += 1  # blej
-            elif rsi > 70:
-                signal -= 1  # shit
+    signal = pd.Series(0, index=historical_prices.index)
 
-            # EMA crossover
-            if ema12 > ema26 and (i > 0 and df["ema12"].iloc[i-1] <= df["ema26"].iloc[i-1]):
-                signal += 1  # blej
-            elif ema12 < ema26 and (i > 0 and df["ema12"].iloc[i-1] >= df["ema26"].iloc[i-1]):
-                signal -= 1  # shit
+    # RSI sinjal
+    signal[valid & (rsi < 30)] += 1
+    signal[valid & (rsi > 70)] -= 1
 
-            # MACD crossover me peshë më të lartë (+2/-2) dhe shtim për histogram
-            if macd > macd_signal and (i > 0 and df["macd"].iloc[i-1] <= df["macd_signal"].iloc[i-1]):
-                signal += 2  # blej më fort
-            elif macd < macd_signal and (i > 0 and df["macd"].iloc[i-1] >= df["macd_signal"].iloc[i-1]):
-                signal -= 2  # shit më fort
+    # EMA crossover
+    ema_buy = (ema12 > ema26) & (ema12.shift(1) <= ema26.shift(1))
+    ema_sell = (ema12 < ema26) & (ema12.shift(1) >= ema26.shift(1))
+    signal[valid & ema_buy] += 1
+    signal[valid & ema_sell] -= 1
 
-            # Shtim për MACD zero line dhe histogram për sinjale më të forta
-            if macd > 0 and histogram > 0:
-                signal += 1  # përforcim blej
-            elif macd < 0 and histogram < 0:
-                signal -= 1  # përforcim shit
+    # MACD crossover me peshë më të lartë
+    macd_buy = (macd > macd_signal) & (macd.shift(1) <= macd_signal.shift(1))
+    macd_sell = (macd < macd_signal) & (macd.shift(1) >= macd_signal.shift(1))
+    signal[valid & macd_buy] += 2
+    signal[valid & macd_sell] -= 2
 
-            # Bollinger Bands
-            if price < lower:
-                signal += 1  # blej
-            elif price > upper:
-                signal -= 1  # shit
+    # Përforcim MACD zero line dhe histogram
+    macd_positive = (macd > 0) & (histogram > 0)
+    macd_negative = (macd < 0) & (histogram < 0)
+    signal[valid & macd_positive] += 1
+    signal[valid & macd_negative] -= 1
 
-            signals.append(signal)
-        return signals
+    # Bollinger Bands
+    signal[valid & (price < lower)] += 1
+    signal[valid & (price > upper)] -= 1
 
-    historical_prices["signal"] = generate_signals(historical_prices)
+    historical_prices["signal"] = signal
     
-    # Ngjyrat sipas sinjalit (përshtatur për sinjale më të forta)
+    # Ngjyrat sipas sinjalit
     def get_color(signal):
         if signal > 3:
-            return 'darkgreen'  # shumë fort blej
+            return 'darkgreen'
         elif signal > 1:
-            return 'green'      # blej
+            return 'green'
         elif signal < -3:
-            return 'darkred'    # shumë fort shit
+            return 'darkred'
         elif signal < -1:
-            return 'red'        # shit
+            return 'red'
         else:
-            return 'yellow'     # neutral
+            return 'yellow'
 
-    colors = historical_prices["signal"].apply(get_color)
+    colors = historical_prices["signal"].map(get_color)
 
-    # Krijo grafik me subplots: Çmimi + Indikatorë lart, RSI në mes, MACD poshtë
+    # Krijo grafik me subplots
     fig = make_subplots(rows=3, cols=1, shared_xaxes=True, 
                         vertical_spacing=0.1, 
                         subplot_titles=(f'Çmimi, EMA, Bollinger Bands për {selected_coin}', 'RSI', 'MACD'),
