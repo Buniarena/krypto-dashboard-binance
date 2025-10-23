@@ -2,12 +2,11 @@ import streamlit as st
 import requests
 import pandas as pd
 import time
-from ta.momentum import RSIIndicator
 
-# 🔔 Zile audio
+# Audio alert URL
 AUDIO_URL = "https://actions.google.com/sounds/v1/alarms/beep_short.ogg"
 
-# Konfigurime
+# Settings
 REFRESH_INTERVAL = 180  # sekonda (3 min)
 REQUEST_DELAY = 1.5
 HEADER_IMAGE_URL = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80"
@@ -50,6 +49,44 @@ def get_historical_prices(coin_id):
     except Exception:
         return pd.DataFrame()
 
-# Llogarit RSI
-def calculate_rsi(df):
-    if df.empty or len(df) <
+# Funksion për llogaritjen e RSI-së
+def calculate_rsi(prices, period=14):
+    delta = prices.diff()
+    delta = delta[1:]
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+
+    avg_gain = gain.rolling(window=period, min_periods=period).mean()[:period+1]
+    avg_loss = loss.rolling(window=period, min_periods=period).mean()[:period+1]
+
+    avg_gain = avg_gain.append(gain[period+1:])
+    avg_loss = avg_loss.append(loss[period+1:])
+
+    for i in range(period + 1, len(prices)):
+        avg_gain.iloc[i] = (avg_gain.iloc[i - 1] * (period - 1) + gain.iloc[i]) / period
+        avg_loss.iloc[i] = (avg_loss.iloc[i - 1] * (period - 1) + loss.iloc[i]) / period
+
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    rsi[:period] = None  # Nuk ka vlera për periudhën fillestare
+    return rsi
+
+# Streamlit UI
+st.image(HEADER_IMAGE_URL, use_column_width=True)
+st.title("Monedhat Kripto dhe RSI")
+
+selected_coin = st.selectbox("Zgjidh monedhën", list(coins.keys()))
+coin_id = coins[selected_coin]
+
+current_data = get_current_data(coin_id)
+if current_data is None:
+    st.error("Nuk u mund të merren të dhënat.")
+else:
+    st.write(f"Çmimi aktual i {selected_coin}: ${current_data['current_price']:.4f}")
+
+historical_prices = get_historical_prices(coin_id)
+if historical_prices.empty:
+    st.warning("Nuk u gjetën çmime historike.")
+else:
+    historical_prices['rsi'] = calculate_rsi(historical_prices['price'])
+    st.line_chart(historical_prices.set_index('timestamp')[['price', 'rsi']])
