@@ -44,6 +44,24 @@ def get_historical_prices(coin_id, days=90):
     except Exception:
         return pd.DataFrame()
 
+@st.cache_data(ttl=60)  # Rifresko çdo minutë për të dhëna të freskëta
+def get_short_term_data(coin_id):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+    params = {"vs_currency": "usd", "days": "1", "interval": "minutely"}
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        if response.status_code == 429:
+            return pd.DataFrame()
+        response.raise_for_status()
+        prices = response.json().get("prices", [])
+        df = pd.DataFrame(prices, columns=["timestamp", "price"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+        df.set_index("timestamp", inplace=True)
+        df["price"] = df["price"].astype(float)
+        return df
+    except Exception:
+        return pd.DataFrame()
+
 def calculate_rsi(prices, period=14):
     if len(prices) < period + 1:
         return pd.Series(np.nan, index=prices.index)
@@ -75,6 +93,16 @@ def calculate_bollinger_bands(prices, window=20, num_std=2):
     lower = sma - (std * num_std)
     return sma, upper, lower
 
+def calculate_probabilities(short_term_df, interval_min=5):
+    if short_term_df.empty or len(short_term_df) < 2:
+        return 50, 50  # Default 50/50 nëse nuk ka të dhëna
+    # Resample në intervalin e specifikuar (5 ose 15 min)
+    resampled = short_term_df["price"].resample(f'{interval_min}T').last().dropna()
+    changes = resampled.diff().dropna()
+    up_prob = (changes > 0).mean() * 100 if len(changes) > 0 else 50
+    down_prob = 100 - up_prob
+    return up_prob, down_prob
+
 st.image(HEADER_IMAGE_URL, use_container_width=True)
 st.title("Analizë Kriptovalutash: RSI, EMA, MACD (me Sinjale më të Forta), Bollinger Bands dhe Sinjale")
 
@@ -96,6 +124,23 @@ else:
         st.metric(label="Kapitalizimi i Tregut", value=f"${current_data['market_cap']:,.0f}")
     with col3:
         st.metric(label="Vëllimi 24h", value=f"${current_data['total_volume']:,.0f}")
+
+# Merr të dhëna afatshkurtra për probabilitete
+short_term_prices = get_short_term_data(coin_id)
+if not short_term_prices.empty:
+    st.subheader("Probabilitetet për Lëvizjen e Ardhshme (bazuar në 24 orët e fundit)")
+    up_5, down_5 = calculate_probabilities(short_term_prices, 5)
+    up_15, down_15 = calculate_probabilities(short_term_prices, 15)
+    
+    col_prob1, col_prob2 = st.columns(2)
+    with col_prob1:
+        st.metric("Shansi për Rritje në 5 Minutat e Ardhshme", f"{up_5:.1f}%")
+        st.metric("Shansi për Rënie në 5 Minutat e Ardhshme", f"{down_5:.1f}%")
+    with col_prob2:
+        st.metric("Shansi për Rritje në 15 Minutat e Ardhshme", f"{up_15:.1f}%")
+        st.metric("Shansi për Rënie në 15 Minutat e Ardhshme", f"{down_15:.1f}%")
+else:
+    st.warning("Nuk u gjetën të dhëna afatshkurtra për probabilitete.")
 
 historical_prices = get_historical_prices(coin_id, days=days)
 if historical_prices.empty:
