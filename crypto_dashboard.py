@@ -3,22 +3,18 @@ import requests
 import pandas as pd
 import time
 
-# Audio alert URL
 AUDIO_URL = "https://actions.google.com/sounds/v1/alarms/beep_short.ogg"
 
-# Settings
-REFRESH_INTERVAL = 180  # sekonda (3 min)
+REFRESH_INTERVAL = 180  # sekonda
 REQUEST_DELAY = 1.5
 HEADER_IMAGE_URL = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80"
 
-# Lista e monedhave
 coins = {
     "PEPE": "pepe",
     "Shiba": "shiba-inu",
     "XVG (Verge)": "verge"
 }
 
-# Merr të dhëna aktuale
 @st.cache_data(ttl=REFRESH_INTERVAL)
 def get_current_data(coin_id):
     url = "https://api.coingecko.com/api/v3/coins/markets"
@@ -32,7 +28,6 @@ def get_current_data(coin_id):
     except Exception:
         return None
 
-# Merr çmimet historike
 @st.cache_data(ttl=REFRESH_INTERVAL)
 def get_historical_prices(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
@@ -49,29 +44,40 @@ def get_historical_prices(coin_id):
     except Exception:
         return pd.DataFrame()
 
-# Funksion për llogaritjen e RSI-së
 def calculate_rsi(prices, period=14):
-    delta = prices.diff()
-    delta = delta[1:]
+    if prices is None or len(prices) < period + 1:
+        return pd.Series([None] * len(prices), index=prices.index if hasattr(prices, "index") else None)
+
+    delta = prices.diff().fillna(0)
     gain = delta.where(delta > 0, 0)
-    loss = -delta.where(delta < 0, 0)
+    loss = (-delta).where(delta < 0, 0)
 
-    avg_gain = gain.rolling(window=period, min_periods=period).mean()[:period+1]
-    avg_loss = loss.rolling(window=period, min_periods=period).mean()[:period+1]
+    # Metoda Wilder: llogaritja e mesatares së fitimeve dhe humbjeve
+    # Fillimi i initial mesatares me vlera të drejtuara
+    initial_gain = gain.iloc[:period].mean()
+    initial_loss = loss.iloc[:period].mean()
 
-    avg_gain = avg_gain.append(gain[period+1:])
-    avg_loss = avg_loss.append(loss[period+1:])
+    avg_gain = pd.Series(index=prices.index, dtype=float)
+    avg_loss = pd.Series(index=prices.index, dtype=float)
 
-    for i in range(period + 1, len(prices)):
-        avg_gain.iloc[i] = (avg_gain.iloc[i - 1] * (period - 1) + gain.iloc[i]) / period
-        avg_loss.iloc[i] = (avg_loss.iloc[i - 1] * (period - 1) + loss.iloc[i]) / period
+    avg_gain.iloc[period-1] = initial_gain
+    avg_loss.iloc[period-1] = initial_loss
+
+    for i in range(period, len(prices)):
+        gain_i = gain.iloc[i]
+        loss_i = loss.iloc[i]
+        prev_gain = avg_gain.iloc[i-1]
+        prev_loss = avg_loss.iloc[i-1]
+
+        avg_gain.iloc[i] = (prev_gain * (period - 1) + gain_i) / period
+        avg_loss.iloc[i] = (prev_loss * (period - 1) + loss_i) / period
 
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
-    rsi[:period] = None  # Nuk ka vlera për periudhën fillestare
+    rsi[:period-1] = None  # fill early values with None
     return rsi
 
-# Streamlit UI
+# Interfejsi i Streamlit
 st.image(HEADER_IMAGE_URL, use_column_width=True)
 st.title("Monedhat Kripto dhe RSI")
 
@@ -80,13 +86,19 @@ coin_id = coins[selected_coin]
 
 current_data = get_current_data(coin_id)
 if current_data is None:
-    st.error("Nuk u mund të merren të dhënat.")
+    st.error("Nuk u mund të merren të dhënat për monedhën e zgjedhur.")
+elif "error" in current_data:
+    st.error(f"Gabim API: {current_data['error']}")
 else:
-    st.write(f"Çmimi aktual i {selected_coin}: ${current_data['current_price']:.4f}")
+    st.metric(label=f"Çmimi aktual i {selected_coin}", value=f"${current_data['current_price']:.6f}")
 
 historical_prices = get_historical_prices(coin_id)
 if historical_prices.empty:
     st.warning("Nuk u gjetën çmime historike.")
 else:
-    historical_prices['rsi'] = calculate_rsi(historical_prices['price'])
-    st.line_chart(historical_prices.set_index('timestamp')[['price', 'rsi']])
+    # Sigurohemi që data të jenë në një format të përshtatshëm për indeksim
+    historical_prices = historical_prices.sort_values("timestamp")
+    historical_prices["rsi"] = calculate_rsi(historical_prices["price"])
+    # Shfaq një grafik me çmimet dhe RSI-në
+    chart_df = historical_prices.set_index("timestamp")[["price", "rsi"]]
+    st.line_chart(chart_df)
