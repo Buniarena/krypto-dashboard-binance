@@ -91,9 +91,9 @@ else:
     def signal_from_rsi(rsi):
         if rsi is None:
             return 0
-        elif rsi < 30:
+        elif rsi < 35:
             return 1   # blej
-        elif rsi > 70:
+        elif rsi > 65:
             return -1  # shit
         else:
             return 0   # neutral
