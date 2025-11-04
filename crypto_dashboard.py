@@ -6,25 +6,40 @@ from ta.trend import EMAIndicator, MACD
 from ta.volatility import BollingerBands
 from datetime import datetime
 import random
-import os
 
 # ==============================
-# ⚙️ KONFIGURIMET
+# ⚙️ KONFIGURIME
 # ==============================
 
-TELEGRAM_BOT_TOKEN = "7627051456:AAHTTyUyP9i4ug3MUo63zmeeA3Uq61ByKKg"
-TELEGRAM_CHAT_ID = "7274463074"
+BOT_TOKEN = "7627051456:AAHTTyUyP9i4ug3MUo63zmeeA3Uq61ByKKg"
+CHAT_ID = "7274463074"
 
 coins = {
+    "Bitcoin": "bitcoin",
+    "Ethereum": "ethereum",
     "PEPE": "pepe",
     "Shiba": "shiba-inu",
-    "XVG (Verge)": "verge",
-    "Bitcoin": "bitcoin",
-    "Ethereum": "ethereum"
+    "XVG (Verge)": "verge"
 }
 
 # ==============================
-# 🔗 FUNKSIONE PËR TË DHËNA
+# 🔗 TELEGRAM TEST
+# ==============================
+
+def send_telegram_message(text):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
+    try:
+        r = requests.post(url, json=payload, timeout=10)
+        if r.status_code != 200:
+            print("❌ Gabim Telegram:", r.text)
+        else:
+            print("✅ Mesazhi u dërgua me sukses.")
+    except Exception as e:
+        print("❌ Problem me lidhjen Telegram:", e)
+
+# ==============================
+# 🔗 TË DHËNA
 # ==============================
 
 def get_current_data(coin_id):
@@ -46,97 +61,79 @@ def get_historical_prices(coin_id, days=60):
     return df
 
 # ==============================
-# 📊 LLOGARITJE SINJALESH
+# 📊 ANALIZA
 # ==============================
 
-def calculate_indicators(df):
-    df["rsi"] = RSIIndicator(df["price"]).rsi()
-    df["ema12"] = EMAIndicator(df["price"], 12).ema_indicator()
-    df["ema26"] = EMAIndicator(df["price"], 26).ema_indicator()
-    macd_calc = MACD(df["price"])
-    df["macd"] = macd_calc.macd()
-    df["macd_signal"] = macd_calc.macd_signal()
-    df["macd_histogram"] = macd_calc.macd_diff()
-    bb = BollingerBands(df["price"])
-    df["bollinger_upper"] = bb.bollinger_hband()
-    df["bollinger_lower"] = bb.bollinger_lband()
-    return df
+def analyze_coin(coin_name, coin_id):
+    try:
+        current = get_current_data(coin_id)
+        df = get_historical_prices(coin_id)
+        df["rsi"] = RSIIndicator(df["price"]).rsi()
+        df["ema12"] = EMAIndicator(df["price"], 12).ema_indicator()
+        df["ema26"] = EMAIndicator(df["price"], 26).ema_indicator()
+        macd_calc = MACD(df["price"])
+        df["macd"] = macd_calc.macd()
+        df["macd_signal"] = macd_calc.macd_signal()
+        df["macd_histogram"] = macd_calc.macd_diff()
+        bb = BollingerBands(df["price"])
+        df["bollinger_upper"] = bb.bollinger_hband()
+        df["bollinger_lower"] = bb.bollinger_lband()
 
-def generate_signals(df):
-    signals = []
-    for i in range(len(df)):
         s = 0
-        if df["rsi"].iloc[i] < 30: s += 1
-        elif df["rsi"].iloc[i] > 70: s -= 1
-        if df["ema12"].iloc[i] > df["ema26"].iloc[i]: s += 1
+        rsi = df["rsi"].iloc[-1]
+        ema12 = df["ema12"].iloc[-1]
+        ema26 = df["ema26"].iloc[-1]
+        macd = df["macd"].iloc[-1]
+        macd_signal = df["macd_signal"].iloc[-1]
+        price = df["price"].iloc[-1]
+        upper = df["bollinger_upper"].iloc[-1]
+        lower = df["bollinger_lower"].iloc[-1]
+
+        if rsi < 30: s += 1
+        elif rsi > 70: s -= 1
+        if ema12 > ema26: s += 1
         else: s -= 1
-        if df["macd"].iloc[i] > df["macd_signal"].iloc[i]: s += 2
+        if macd > macd_signal: s += 2
         else: s -= 2
-        if df["price"].iloc[i] < df["bollinger_lower"].iloc[i]: s += 1
-        elif df["price"].iloc[i] > df["bollinger_upper"].iloc[i]: s -= 1
-        signals.append(s)
-    df["signal"] = signals
-    return df
+        if price < lower: s += 1
+        elif price > upper: s -= 1
 
-def classify_signal(s):
-    if s >= 3:
-        return "🟢 BLI"
-    elif s <= -3:
-        return "🔴 SHIT"
-    else:
-        return "🟡 MBANJ"
+        if s >= 3:
+            decision = "🟢 BLI"
+            prob_buy = 80 + random.randint(0, 15)
+            prob_sell = 15 - random.randint(0, 10)
+        elif s <= -3:
+            decision = "🔴 SHIT"
+            prob_buy = 15 - random.randint(0, 10)
+            prob_sell = 80 + random.randint(0, 15)
+        else:
+            decision = "🟡 MBANJ"
+            prob_buy = 50 + random.randint(-10, 10)
+            prob_sell = 50 + random.randint(-10, 10)
 
-def calculate_probabilities(signal):
-    if signal >= 3:
-        return 80 + random.randint(0, 15), 15 - random.randint(0, 10)
-    elif signal <= -3:
-        return 15 - random.randint(0, 10), 80 + random.randint(0, 15)
-    else:
-        return 50 + random.randint(-10, 10), 50 + random.randint(-10, 10)
-
-# ==============================
-# ✈️ FUNKSION TELEGRAM
-# ==============================
-
-def send_telegram_message(text: str):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"}
-    r = requests.post(url, json=payload, timeout=15)
-    if r.status_code != 200:
-        print("Gabim Telegram:", r.text)
-    else:
-        print("✅ Sinjali u dërgua në Telegram")
+        price_txt = f"${current['current_price']:.6f}"
+        msg = (
+            f"🚨 *{coin_name}* – *{decision}*\n"
+            f"💵 Çmimi: {price_txt}\n"
+            f"📊 Prob: *BLI* {prob_buy:.1f}% | *SHIT* {prob_sell:.1f}%\n"
+            f"⏱️ {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n"
+            f"👤 Bunjamin Fetai"
+        )
+        send_telegram_message(msg)
+    except Exception as e:
+        print(f"❌ Gabim me {coin_name}: {e}")
 
 # ==============================
-# 🔁 LOOP AUTOMATIK 1 ORË
+# ⏰ LOOP 1 ORË
 # ==============================
+
+print("🚀 ElbuharBot po fillon…\n")
+send_telegram_message("🤖 Bot-i u aktivizua! Sinjalet do dërgohen çdo 1 orë.")
 
 while True:
-    for selected_coin, coin_id in coins.items():
-        try:
-            current = get_current_data(coin_id)
-            df = get_historical_prices(coin_id, days=60)
-            df = calculate_indicators(df)
-            df = generate_signals(df)
-            latest_signal = df["signal"].iloc[-1]
-            decision = classify_signal(latest_signal)
-            prob_buy, prob_sell = calculate_probabilities(latest_signal)
-            price_txt = f"${current['current_price']:.6f}" if current else "N/A"
-
-            msg = (
-                f"🚨 *{selected_coin}* – *{decision}*\n"
-                f"💵 Çmimi: {price_txt}\n"
-                f"📊 Prob: *BLI* {prob_buy:.1f}% | *SHIT* {prob_sell:.1f}%\n"
-                f"⏱️ {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n"
-                f"👤 Bunjamin Fetai"
-            )
-
-            send_telegram_message(msg)
-            time.sleep(5)  # pak pushim mes dërgesave
-
-        except Exception as e:
-            print(f"Gabim për {selected_coin}: {e}")
-            continue
-
-    print("⏳ Prit 1 orë për sinjalet e reja...")
-    time.sleep(3600)  # 1 orë
+    print(f"\n🕒 {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')} – Dërgim sinjalesh...")
+    for name, cid in coins.items():
+        analyze_coin(name, cid)
+        time.sleep(5)
+    print("✅ Raundi përfundoi. Do përsëritet pas 1 ore.\n")
+    time.sleep(3600)
