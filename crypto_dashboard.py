@@ -1,146 +1,143 @@
-# main_debug.py — ElbuharBot (me debug aktiv, pa Telegram)
-
-import time
+import streamlit as st
 import requests
 import pandas as pd
-from datetime import datetime, timezone
+from ta.momentum import RSIIndicator
+from ta.trend import EMAIndicator, MACD
+from ta.volatility import BollingerBands
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
-# ================= SETTINGS =================
-INTERVAL_SEC = 60 * 60   # çdo 1 orë
-COINS = {
-    "Bitcoin": "bitcoin",
-    "Ethereum": "ethereum",
+# ⚙️ Konfigurime bazë
+AUDIO_URL = "https://actions.google.com/sounds/v1/alarms/beep_short.ogg"
+REFRESH_INTERVAL = 180
+HEADER_IMAGE_URL = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80"
+
+coins = {
     "PEPE": "pepe",
     "Shiba": "shiba-inu",
-    "XVG (Verge)": "verge"
+    "XVG (Verge)": "verge",
+    "Bitcoin": "bitcoin",
+    "Ethereum": "ethereum"
 }
-HIST_DAYS = 60
-TIMEOUT = 15
-MAX_RETRY = 5
-last_signals = {}
 
-# ============ HTTP helper ============
-def http_get_json(url, params=None):
-    delay = 1
-    for attempt in range(1, MAX_RETRY + 1):
-        try:
-            print(f"🌐 GET {url.split('/')[-1]} (attempt {attempt})")
-            r = requests.get(url, params=params, timeout=TIMEOUT)
-            if r.status_code == 200:
-                return r.json()
-            print(f"⚠️ HTTP {r.status_code}, retry pas {delay}s")
-            time.sleep(delay)
-            delay = min(delay * 2, 30)
-        except Exception as e:
-            print(f"❌ Network error {attempt}: {e}")
-            time.sleep(delay)
-    return None
-
-# ============ DATA ============
-def get_current_price_row(coin_id):
+# ⚡ Merr të dhëna aktuale
+@st.cache_data(ttl=REFRESH_INTERVAL, show_spinner=False)
+def get_current_data(coin_id):
     url = "https://api.coingecko.com/api/v3/coins/markets"
-    js = http_get_json(url, {"vs_currency": "usd", "ids": coin_id})
-    if not js:
-        raise RuntimeError("❌ S'ka current data për " + coin_id)
-    return js[0]
+    params = {"vs_currency": "usd", "ids": coin_id}
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        r.raise_for_status()
+        return r.json()[0]
+    except Exception:
+        return None
 
-def get_hist_df(coin_id, days=HIST_DAYS):
+# ⚡ Merr çmimet historike
+@st.cache_data(ttl=REFRESH_INTERVAL, show_spinner=False)
+def get_historical_prices(coin_id, days=60):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-    js = http_get_json(url, {"vs_currency": "usd", "days": str(days), "interval": "daily"})
-    if not js or "prices" not in js:
-        raise RuntimeError("❌ S'ka historik për " + coin_id)
-    df = pd.DataFrame(js["prices"], columns=["ts", "price"])
-    df["ts"] = pd.to_datetime(df["ts"], unit="ms", utc=True)
-    df.set_index("ts", inplace=True)
-    return df.dropna()
+    params = {"vs_currency": "usd", "days": str(days), "interval": "daily"}
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        r.raise_for_status()
+        prices = r.json().get("prices", [])
+        df = pd.DataFrame(prices, columns=["timestamp", "price"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+        df.set_index("timestamp", inplace=True)
+        return df
+    except Exception:
+        return pd.DataFrame()
 
-# ============ INDICATORS ============
-def ema(s, span): return s.ewm(span=span, adjust=False).mean()
+# 🧠 Fillimi i aplikacionit
+st.image(HEADER_IMAGE_URL, use_column_width="always")
+st.title("⚡ Analizë Kriptovalutash e Shpejtë (RSI, EMA, MACD, Bollinger Bands & Sinjale)")
 
-def rsi(s, period=14):
-    delta = s.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(period).mean()
-    avg_loss = loss.rolling(period).mean()
-    for i in range(period, len(s)):
-        avg_gain.iat[i] = (avg_gain.iat[i-1]*(period-1)+gain.iat[i])/period
-        avg_loss.iat[i] = (avg_loss.iat[i-1]*(period-1)+loss.iat[i])/period
-    rs = avg_gain / avg_loss.replace(0, pd.NA)
-    return 100 - (100 / (1 + rs))
+selected_coin = st.selectbox("Zgjidh monedhën", list(coins.keys()))
+coin_id = coins[selected_coin]
+days = st.slider("Numri i ditëve historike", 30, 60, 30, 15)
 
-def macd(s, fast=12, slow=26, signal=9):
-    macd_line = ema(s, fast) - ema(s, slow)
-    sig = ema(macd_line, signal)
-    return macd_line, sig, macd_line - sig
+# Merr të dhëna aktuale
+current_data = get_current_data(coin_id)
+if current_data is None:
+    st.error("Nuk u mund të merren të dhënat.")
+else:
+    col1, col2, col3 = st.columns(3)
+    col1.metric(f"Çmimi aktual i {selected_coin}", f"${current_data['current_price']:.6f}")
+    col2.metric("Kapitalizimi i Tregut", f"${current_data['market_cap']:,.0f}")
+    col3.metric("Vëllimi 24h", f"${current_data['total_volume']:,.0f}")
 
-def bollinger(s, window=20, num_std=2):
-    sma = s.rolling(window).mean()
-    std = s.rolling(window).std()
-    return sma, sma + num_std * std, sma - num_std * std
+# Merr historikun
+df = get_historical_prices(coin_id, days)
+if df.empty:
+    st.warning("Nuk ka të dhëna historike.")
+    st.stop()
 
-# ============ LOGJIKA ============
-def score(p, rsi_v, e12, e26, m, ms, up, low):
-    s = 0
-    if pd.notna(rsi_v):
-        if rsi_v < 30: s += 1
-        elif rsi_v > 70: s -= 1
-    if pd.notna(e12) and pd.notna(e26):
-        s += 1 if e12 > e26 else -1
-    if pd.notna(m) and pd.notna(ms):
-        s += 2 if m > ms else -2
-    if pd.notna(p) and pd.notna(up) and pd.notna(low):
-        if p < low: s += 1
-        elif p > up: s -= 1
-    return s
+# 📈 Llogarit indikatorët me bibliotekën TA (shumë më shpejt)
+df["rsi"] = RSIIndicator(df["price"]).rsi()
+df["ema12"] = EMAIndicator(df["price"], 12).ema_indicator()
+df["ema26"] = EMAIndicator(df["price"], 26).ema_indicator()
+macd_calc = MACD(df["price"])
+df["macd"] = macd_calc.macd()
+df["macd_signal"] = macd_calc.macd_signal()
+df["macd_histogram"] = macd_calc.macd_diff()
+bb = BollingerBands(df["price"])
+df["bollinger_upper"] = bb.bollinger_hband()
+df["bollinger_lower"] = bb.bollinger_lband()
 
-def classify(s):
-    if s >= 3: return "🟢 BLI"
-    if s <= -3: return "🔴 SHIT"
-    return "🟡 MBANJ"
+# 🧩 Gjenero sinjale tregtare
+def generate_signals(df):
+    signals = []
+    for i in range(len(df)):
+        s = 0
+        if df["rsi"].iloc[i] < 30: s += 1
+        elif df["rsi"].iloc[i] > 70: s -= 1
+        if df["ema12"].iloc[i] > df["ema26"].iloc[i]: s += 1
+        else: s -= 1
+        if df["macd"].iloc[i] > df["macd_signal"].iloc[i]: s += 2
+        else: s -= 2
+        if df["price"].iloc[i] < df["bollinger_lower"].iloc[i]: s += 1
+        elif df["price"].iloc[i] > df["bollinger_upper"].iloc[i]: s -= 1
+        signals.append(s)
+    return signals
 
-def probs(s):
-    if s >= 3: return 90, 10
-    if s <= -3: return 10, 90
-    scale = (s + 2) / 4
-    b = 35 + scale * 30
-    return round(b, 1), round(100 - b, 1)
+df["signal"] = generate_signals(df)
 
-# ============ ANALYZE ============
-def analyze(coin, cid):
-    print(f"📈 Analizë për {coin}")
-    cur = get_current_price_row(cid)
-    df = get_hist_df(cid)
-    df["ema12"], df["ema26"] = ema(df["price"], 12), ema(df["price"], 26)
-    df["rsi"] = rsi(df["price"])
-    df["macd"], df["macd_sig"], _ = macd(df["price"])
-    df["sma20"], df["bb_up"], df["bb_lo"] = bollinger(df["price"])
-    last = df.iloc[-1]
-    s = score(last["price"], last["rsi"], last["ema12"], last["ema26"],
-              last["macd"], last["macd_sig"], last["bb_up"], last["bb_lo"])
-    d = classify(s)
-    pb, ps = probs(s)
-    txt = f"{coin}: {d} | Çmim ${cur['current_price']:.6f} | BLI {pb}% / SHIT {ps}%"
-    if last_signals.get(coin) != d:
-        print("⚡ SINJAL I RI:", txt)
-        last_signals[coin] = d
-    else:
-        print(txt)
+def get_color(s):
+    if s > 3: return "darkgreen"
+    elif s > 1: return "green"
+    elif s < -3: return "darkred"
+    elif s < -1: return "red"
+    return "yellow"
 
-# ============ LOOP ============
-def run_once():
-    print(f"\n🕒 Raund {datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}")
-    for coin, cid in COINS.items():
-        try:
-            analyze(coin, cid)
-            time.sleep(2)
-        except Exception as e:
-            print(f"❌ Gabim tek {coin}: {e}")
+colors = df["signal"].apply(get_color)
 
-if __name__ == "__main__":
-    print("🚀 Start ElbuharBot debug mode…")
-    run_once()
-    while True:
-        print("\n⏳ Prit 1 orë për raundin tjetër…")
-        time.sleep(INTERVAL_SEC)
-        run_once()
+# 🎯 Grafik me 3 pjesë
+fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.07,
+                    subplot_titles=(f'Çmimi & EMA për {selected_coin}', 'RSI', 'MACD'),
+                    row_heights=[0.5, 0.2, 0.3])
+
+# Çmimi dhe EMA
+fig.add_trace(go.Scatter(x=df.index, y=df["price"], mode="lines", name="Çmimi", line=dict(color="blue")), row=1, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=df["ema12"], mode="lines", name="EMA 12", line=dict(color="orange")), row=1, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=df["ema26"], mode="lines", name="EMA 26", line=dict(color="purple")), row=1, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=df["bollinger_upper"], mode="lines", name="Bollinger Upper", line=dict(color="gray")), row=1, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=df["bollinger_lower"], mode="lines", name="Bollinger Lower", line=dict(color="gray")), row=1, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=df["price"], mode="markers", name="Sinjal", marker=dict(color=colors, size=8)), row=1, col=1)
+
+# RSI
+fig.add_trace(go.Scatter(x=df.index, y=df["rsi"], mode="lines", name="RSI", line=dict(color="teal")), row=2, col=1)
+fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
+fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+
+# MACD
+fig.add_trace(go.Scatter(x=df.index, y=df["macd"], mode="lines", name="MACD", line=dict(color="blue")), row=3, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=df["macd_signal"], mode="lines", name="MACD Signal", line=dict(color="orange")), row=3, col=1)
+fig.add_trace(go.Bar(x=df.index, y=df["macd_histogram"], name="Histogram", marker_color="gray"), row=3, col=1)
+fig.add_hline(y=0, line_dash="dash", line_color="black", row=3, col=1)
+
+fig.update_layout(height=900, title=f"Analizë e Shpejtë për {selected_coin}", showlegend=True)
+st.plotly_chart(fig, use_container_width=True)
+
+# 📊 Tabela me 5 ditët e fundit
+st.subheader("Të dhënat e fundit (5 ditët e fundit)")
+st.dataframe(df.tail(5)[["price", "rsi", "ema12", "ema26", "macd", "macd_signal", "signal"]])
