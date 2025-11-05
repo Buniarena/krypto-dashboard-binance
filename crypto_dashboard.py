@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # ⚙️ KONFIGURIME
-REFRESH_INTERVAL = 60  # çdo 1 minutë
+REFRESH_INTERVAL = 30  # çdo 30 sekonda
 HEADER_IMAGE_URL = "https://images.unsplash.com/photo-1629654297299-cf0f61f84ad2?auto=format&fit=crop&w=1200&q=80"
 
 coins = {
@@ -55,7 +55,7 @@ def get_historical_prices_last_hours(coin_id, hours=3):
 # 🌄 HEADER
 st.image(HEADER_IMAGE_URL, use_column_width=True)
 st.markdown("<h1 style='text-align:center; color:#00C4CC;'>🚀 ElbuharBot PRO Live Radar</h1>", unsafe_allow_html=True)
-st.caption("⏱️ Analizë e gjallë për 3 orët e fundit | Rifreskohet çdo 1 minutë")
+st.caption("⏱️ Analizë e gjallë 3-orëshe | Rifreskohet çdo 30 sekonda")
 
 # 💰 ZGJEDHJA E MONEDHËS
 selected_coin = st.selectbox("💎 Zgjidh monedhën për analizë:", list(coins.keys()))
@@ -102,16 +102,13 @@ signal_text = latest.signal_text
 prob_up = min(95, max(5, 50 + latest.signal * 10 + random.randint(-5, 5)))
 prob_down = 100 - prob_up
 
-# 🎨 GRÁFIK I GJALLË
+# 🎨 GRAFIK
 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.6, 0.4],
                     subplot_titles=(f"💰 {selected_coin} – Çmimi & EMA", "RSI & MACD"))
 
-# Çmimi & EMA
 fig.add_trace(go.Scatter(x=df.index, y=df["price"], name="Çmimi", line=dict(color="#00BFFF", width=2)))
 fig.add_trace(go.Scatter(x=df.index, y=df["ema12"], name="EMA12", line=dict(color="#FFA500", width=1)))
 fig.add_trace(go.Scatter(x=df.index, y=df["ema26"], name="EMA26", line=dict(color="#9B30FF", width=1)))
-
-# RSI dhe MACD
 fig.add_trace(go.Scatter(x=df.index, y=df["rsi"], name="RSI", line=dict(color="teal", width=2)), row=2, col=1)
 fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
 fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
@@ -123,12 +120,11 @@ fig.update_layout(
     plot_bgcolor="black",
     font=dict(color="white"),
 )
-
 st.plotly_chart(fig, use_container_width=True)
 
 # ⚡ PANEL SINJALI
 st.markdown("---")
-st.markdown(f"<h2 style='text-align:center;'>📢 {signal_text}</h2>", unsafe_allow_html=True)
+st.markdown(f"<h2 style='text-align:center;'>{signal_text}</h2>", unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 col1.metric("💵 Çmimi aktual", f"${current['current_price']:.6f}")
@@ -154,5 +150,14 @@ radar_fig.add_trace(go.Indicator(
 radar_fig.update_layout(height=300, paper_bgcolor="rgba(0,0,0,0)", font=dict(color="white", size=14))
 st.plotly_chart(radar_fig, use_container_width=True)
 
-# 🕒 Footer
-st.markdown(f"<div style='text-align:center; color:gray;'>🔄 Rifreskim automatik çdo 1 minutë | Përditësuar më: {datetime.utcnow().strftime('%H:%M:%S UTC')}</div>", unsafe_allow_html=True)
+# 🕒 TIMER (NUMËRIM DERI NË RIFRESKIM)
+st.markdown("<hr>", unsafe_allow_html=True)
+placeholder = st.empty()
+for sec in range(REFRESH_INTERVAL, 0, -1):
+    placeholder.markdown(
+        f"<div style='text-align:center; font-size:20px; color:#00FFAA;'>⏳ Rifreskim pas {sec} sekondash...</div>",
+        unsafe_allow_html=True)
+    time.sleep(1)
+    placeholder.empty()
+
+st.rerun()
