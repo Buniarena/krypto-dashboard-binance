@@ -15,7 +15,7 @@ COINS = {
     "🐕 Shiba Inu": "SHIBUSDT",
     "⚡ Verge (XVG)": "XVGUSDT"
 }
-st.set_page_config(page_title="ElbuharBot PRO – Binance Fast Edition", layout="wide")
+st.set_page_config(page_title="ElbuharBot PRO – Bybit Edition", layout="wide")
 
 # 🎨 Stil Neon
 st.markdown("""
@@ -31,28 +31,35 @@ body { background-color:black; color:white; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("💹 ElbuharBot PRO – Binance Fast Edition")
+st.title("💹 ElbuharBot PRO – Bybit Live Radar")
 
 # ======================== FUNKSIONE ========================
 def get_current_price(symbol):
     try:
-        url = "https://api.binance.com/api/v3/ticker/price"
-        r = requests.get(url, params={"symbol": symbol}, timeout=10)
-        return float(r.json()["price"])
-    except:
+        url = "https://api.bybit.com/v5/market/tickers"
+        params = {"category": "spot", "symbol": symbol}
+        r = requests.get(url, params=params, timeout=10)
+        data = r.json()
+        return float(data["result"]["list"][0]["lastPrice"])
+    except Exception as e:
+        print("Gabim current:", e)
         return None
 
 def get_historical_data(symbol, limit=180):
     try:
-        url = "https://api.binance.com/api/v3/klines"
-        params = {"symbol": symbol, "interval": "1m", "limit": limit}
+        url = "https://api.bybit.com/v5/market/kline"
+        params = {"category": "spot", "symbol": symbol, "interval": "1", "limit": limit}
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
-        df = pd.DataFrame([[x[0], float(x[4])] for x in data], columns=["time", "price"])
-        df["time"] = pd.to_datetime(df["time"], unit="ms")
-        df.set_index("time", inplace=True)
+        if "result" not in data or "list" not in data["result"]:
+            return pd.DataFrame()
+        df = pd.DataFrame(data["result"]["list"], columns=["time","open","high","low","close","volume"])
+        df["time"] = pd.to_datetime(df["time"], unit="s")
+        df["price"] = df["close"].astype(float)
+        df = df[["time","price"]].set_index("time").sort_index()
         return df
-    except:
+    except Exception as e:
+        print("Gabim historik:", e)
         return pd.DataFrame()
 
 def generate_signal(row):
@@ -78,7 +85,7 @@ coin_label = st.selectbox("💎 Zgjidh monedhën:", list(COINS.keys()))
 symbol = COINS[coin_label]
 price = get_current_price(symbol)
 if not price:
-    st.error("❌ Nuk mund të merren të dhëna nga Binance.")
+    st.error("❌ Nuk mund të merren të dhëna nga Bybit.")
     st.stop()
 
 df = get_historical_data(symbol)
@@ -103,7 +110,6 @@ df["signal_text"] = df["signal"].apply(classify_signal)
 last = df.iloc[-1]
 sig = last.signal_text
 color = "lime" if "BLI" in sig else "red" if "SHIT" in sig else "yellow"
-
 prob_up = min(95, max(5, 50 + last.signal * 10 + random.randint(-5,5)))
 
 # ======================== SINJALI ========================
