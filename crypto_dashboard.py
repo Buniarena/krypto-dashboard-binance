@@ -11,11 +11,11 @@ from plotly.subplots import make_subplots
 # ⚙️ Konfigurime
 REFRESH_INTERVAL = 30
 COINS = {
-    "🐸 PEPE": "PEPEUSDT",
-    "🐕 Shiba Inu": "SHIBUSDT",
-    "⚡ Verge (XVG)": "XVGUSDT"
+    "🐸 PEPE": ("PEPEUSDT", "pepe"),
+    "🐕 Shiba Inu": ("SHIBUSDT", "shiba-inu"),
+    "⚡ Verge (XVG)": ("XVGUSDT", "verge")
 }
-st.set_page_config(page_title="ElbuharBot PRO – Bybit Edition", layout="wide")
+st.set_page_config(page_title="ElbuharBot PRO – Hybrid Edition", layout="wide")
 
 # 🎨 Stil Neon
 st.markdown("""
@@ -31,21 +31,31 @@ body { background-color:black; color:white; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("💹 ElbuharBot PRO – Bybit Live Radar")
+st.title("💹 ElbuharBot PRO – Hybrid Bybit + CoinGecko Radar")
 
 # ======================== FUNKSIONE ========================
-def get_current_price(symbol):
+def get_current_bybit(symbol):
     try:
         url = "https://api.bybit.com/v5/market/tickers"
         params = {"category": "spot", "symbol": symbol}
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
-        return float(data["result"]["list"][0]["lastPrice"])
-    except Exception as e:
-        print("Gabim current:", e)
+        if "result" in data and "list" in data["result"]:
+            return float(data["result"]["list"][0]["lastPrice"])
+    except:
+        return None
+    return None
+
+def get_current_cg(coin_id):
+    try:
+        url = f"https://api.coingecko.com/api/v3/simple/price"
+        r = requests.get(url, params={"ids": coin_id, "vs_currencies": "usd"}, timeout=10)
+        data = r.json()
+        return float(data[coin_id]["usd"])
+    except:
         return None
 
-def get_historical_data(symbol, limit=180):
+def get_historical_bybit(symbol, limit=180):
     try:
         url = "https://api.bybit.com/v5/market/kline"
         params = {"category": "spot", "symbol": symbol, "interval": "1", "limit": limit}
@@ -58,8 +68,24 @@ def get_historical_data(symbol, limit=180):
         df["price"] = df["close"].astype(float)
         df = df[["time","price"]].set_index("time").sort_index()
         return df
-    except Exception as e:
-        print("Gabim historik:", e)
+    except:
+        return pd.DataFrame()
+
+def get_historical_cg(coin_id, hours=3):
+    try:
+        now = int(time.time())
+        past = now - hours * 3600
+        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart/range"
+        params = {"vs_currency": "usd", "from": str(past), "to": str(now)}
+        r = requests.get(url, params=params, timeout=10)
+        data = r.json()
+        if "prices" not in data:
+            return pd.DataFrame()
+        df = pd.DataFrame(data["prices"], columns=["time","price"])
+        df["time"] = pd.to_datetime(df["time"], unit="ms")
+        df.set_index("time", inplace=True)
+        return df
+    except:
         return pd.DataFrame()
 
 def generate_signal(row):
@@ -82,15 +108,26 @@ def classify_signal(s):
 
 # ======================== UI ========================
 coin_label = st.selectbox("💎 Zgjidh monedhën:", list(COINS.keys()))
-symbol = COINS[coin_label]
-price = get_current_price(symbol)
+symbol, cg_id = COINS[coin_label]
+
+# Çmimi aktual (Bybit ose CG)
+price = get_current_bybit(symbol)
+source = "Bybit"
 if not price:
-    st.error("❌ Nuk mund të merren të dhëna nga Bybit.")
+    price = get_current_cg(cg_id)
+    source = "CoinGecko"
+if not price:
+    st.error("❌ Nuk mund të merren të dhëna as nga Bybit, as nga CoinGecko.")
     st.stop()
 
-df = get_historical_data(symbol)
+# Historiku
+df = get_historical_bybit(symbol)
 if df.empty:
-    st.warning("⚠️ Nuk ka të dhëna historike për momentin.")
+    df = get_historical_cg(cg_id, hours=3)
+    source = "CoinGecko (fallback)"
+
+if df.empty:
+    st.warning("⚠️ Nuk u gjetën të dhëna historike.")
     st.stop()
 
 # ======================== INDIKATORËT ========================
@@ -114,6 +151,7 @@ prob_up = min(95, max(5, 50 + last.signal * 10 + random.randint(-5,5)))
 
 # ======================== SINJALI ========================
 st.markdown(f"<div class='neon' style='color:{color};'>{sig}</div>", unsafe_allow_html=True)
+st.caption(f"📡 Burim: {source}")
 col1, col2 = st.columns(2)
 col1.metric("💵 Çmimi aktual", f"${price:.6f}")
 col2.metric("📈 Mundësia për ngritje", f"{prob_up}%")
