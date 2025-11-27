@@ -157,8 +157,10 @@ col1.metric("💵 Çmimi aktual", f"${price:.6f}")
 col2.metric("📈 Mundësia për ngritje", f"{prob_up}%")
 
 # ======================== GRAFIKU ========================
-fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.5,0.25,0.25],
-                    subplot_titles=(f"{coin_label} – Çmimi & EMA", "RSI", "MACD"))
+fig = make_subplots(
+    rows=3, cols=1, shared_xaxes=True, row_heights=[0.5,0.25,0.25],
+    subplot_titles=(f"{coin_label} – Çmimi & EMA", "RSI", "MACD")
+)
 fig.add_trace(go.Scatter(x=df.index, y=df["price"], name="Çmimi", line=dict(color="#00E5FF", width=2)))
 fig.add_trace(go.Scatter(x=df.index, y=df["ema12"], name="EMA12", line=dict(color="#FFA500")))
 fig.add_trace(go.Scatter(x=df.index, y=df["ema26"], name="EMA26", line=dict(color="#9400D3")))
@@ -174,8 +176,85 @@ st.plotly_chart(fig, use_container_width=True)
 
 # ======================== TABELA ========================
 st.subheader("📊 Të dhënat e fundit (10 rreshta)")
-st.dataframe(df.tail(10)[["price", "rsi", "ema12", "ema26", "macd", "macd_signal",
-                          "boll_upper", "boll_lower", "signal_text"]])
+st.dataframe(df.tail(10)[[
+    "price", "rsi", "ema12", "ema26",
+    "macd", "macd_signal", "boll_upper",
+    "boll_lower", "signal_text"
+]])
+
+# ======================== PORTOFOLI ========================
+st.markdown("---")
+st.header("📦 Portofoli im")
+
+# Marrim çmimet aktuale për të gjitha monedhat e portofolit
+prices_now = {}
+for label, (sym, cg) in COINS.items():
+    p = get_current_bybit(sym)
+    if not p:
+        p = get_current_cg(cg)
+    prices_now[label] = p
+
+# Ruajmë sasitë në session_state që të mos humbin me çdo refresh
+if "portfolio" not in st.session_state:
+    st.session_state["portfolio"] = {label: 0.0 for label in COINS.keys()}
+
+st.subheader("🔢 Vendos sasitë që ke në portofol")
+cols_port = st.columns(len(COINS))
+
+for i, (label, (sym, cg)) in enumerate(COINS.items()):
+    with cols_port[i]:
+        qty = st.number_input(
+            f"{label} sasia",
+            min_value=0.0,
+            step=0.000001,
+            value=float(st.session_state["portfolio"].get(label, 0.0)),
+            format="%.6f"
+        )
+        st.session_state["portfolio"][label] = qty
+        price_now = prices_now[label]
+        if price_now:
+            st.caption(f"Çmimi: ${price_now:.8f}")
+        else:
+            st.caption("❌ Pa çmim aktual")
+
+# 📊 Tabela e portofolit
+rows = []
+total_value = 0.0
+
+for label, qty in st.session_state["portfolio"].items():
+    price_now = prices_now[label]
+    if price_now is None or qty == 0:
+        value = 0.0
+    else:
+        value = qty * price_now
+    total_value += value
+    rows.append({
+        "Monedha": label,
+        "Sasia": qty,
+        "Çmimi aktual (USD)": price_now,
+        "Vlera (USD)": value
+    })
+
+port_df = pd.DataFrame(rows)
+
+st.subheader("📊 Portofoli – Vlera aktuale")
+st.dataframe(port_df)
+st.metric("💰 Vlera totale e portofolit", f"${total_value:,.2f}")
+
+# 🎯 Sinjali i lidhur me portofolin për monedhën e zgjedhur
+st.subheader("🎯 Sinjali për portofolin tënd")
+qty_current_coin = st.session_state["portfolio"].get(coin_label, 0.0)
+
+if qty_current_coin > 0:
+    st.write(f"Ke **{qty_current_coin}** nga {coin_label}.")
+    if "BLI" in sig:
+        st.write("Sinjali është **BLI** – nëse beson algoritmin, mund të mendosh për rritje pozicioni (me kujdes).")
+    elif "SHIT" in sig:
+        st.write("Sinjali është **SHIT** – ndoshta ia vlen të mbyllësh një pjesë të pozicionit, sipas strategjisë tënde.")
+    else:
+        st.write("Sinjali është **MBANJ** – as blerje agresive, as shitje agresive.")
+else:
+    st.write(f"Nuk ke {coin_label} në portofol aktualisht.")
 
 # ======================== TIMER ========================
 ph = st.empty()
