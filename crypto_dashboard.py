@@ -16,7 +16,7 @@ COINS = {
     "⚡ Verge (XVG)": ("XVGUSDT", "verge")
 }
 
-st.set_page_config(page_title="ElbuharBot PRO – Hybrid Edition", layout="wide")
+st.set_page_config(page_title="ElbuharBot PRO – Binance Edition", layout="wide")
 
 # 🎨 Stil Neon
 st.markdown("""
@@ -32,107 +32,54 @@ body { background-color:black; color:white; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("💹 ElbuharBot PRO – Hybrid Bybit + CoinGecko Radar")
+st.title("💹 ElbuharBot PRO – Binance Radar + Portofol")
 
 # ======================== FUNKSIONE ========================
-def get_current_bybit(symbol):
-    try:
-        url = "https://api.bybit.com/v5/market/tickers"
-        params = {"category": "spot", "symbol": symbol}
-        r = requests.get(url, params=params, timeout=10)
+BINANCE_BASE = "https://api.binance.com"
 
+def get_current_price(symbol):
+    """Çmimi aktual nga Binance."""
+    try:
+        url = f"{BINANCE_BASE}/api/v3/ticker/price"
+        r = requests.get(url, params={"symbol": symbol}, timeout=10)
         if r.status_code != 200:
-            st.write("Bybit status:", r.status_code, r.text[:200])
+            st.write("Binance price status:", r.status_code, r.text[:200])
             return None
-
         data = r.json()
-        if "result" in data and data["result"].get("list"):
-            return float(data["result"]["list"][0]["lastPrice"])
-
-        st.write("Bybit përgjigje pa 'list':", data)
-        return None
-
+        return float(data["price"])
     except Exception as e:
-        st.write("Gabim Bybit:", e)
+        st.write("Gabim Binance price:", e)
         return None
 
 
-def get_current_cg(coin_id):
+def get_historical_binance(symbol, interval="1m", limit=180):
+    """Historik candlestick nga Binance."""
     try:
-        url = "https://api.coingecko.com/api/v3/simple/price"
-        params = {"ids": coin_id, "vs_currencies": "usd"}
+        url = f"{BINANCE_BASE}/api/v3/klines"
+        params = {"symbol": symbol, "interval": interval, "limit": limit}
         r = requests.get(url, params=params, timeout=10)
-
         if r.status_code != 200:
-            st.write("CoinGecko status:", r.status_code, r.text[:200])
-            return None
-
-        data = r.json()
-        if coin_id in data and "usd" in data[coin_id]:
-            return float(data[coin_id]["usd"])
-
-        st.write("CoinGecko përgjigje e çuditshme:", data)
-        return None
-
-    except Exception as e:
-        st.write("Gabim CoinGecko:", e)
-        return None
-
-
-def get_historical_bybit(symbol, limit=180):
-    try:
-        url = "https://api.bybit.com/v5/market/kline"
-        params = {"category": "spot", "symbol": symbol, "interval": "1", "limit": limit}
-        r = requests.get(url, params=params, timeout=10)
-
-        if r.status_code != 200:
-            st.write("Bybit kline status:", r.status_code, r.text[:200])
+            st.write("Binance kline status:", r.status_code, r.text[:200])
             return pd.DataFrame()
 
         data = r.json()
-        if "result" not in data or "list" not in data["result"]:
-            st.write("Bybit kline pa 'list':", data)
+        if not data:
             return pd.DataFrame()
 
-        df = pd.DataFrame(
-            data["result"]["list"],
-            columns=["time", "open", "high", "low", "close", "volume"]
-        )
-        # Bybit jep ms -> përdor unit="ms"
+        # Kline format: [openTime, open, high, low, close, volume, ...]
+        rows = []
+        for k in data:
+            open_time = int(k[0])   # ms
+            close_price = float(k[4])
+            rows.append([open_time, close_price])
+
+        df = pd.DataFrame(rows, columns=["time", "price"])
         df["time"] = pd.to_datetime(df["time"], unit="ms")
-        df["price"] = df["close"].astype(float)
-        df = df[["time", "price"]].set_index("time").sort_index()
+        df = df.set_index("time").sort_index()
         return df
 
     except Exception as e:
-        st.write("Gabim Bybit kline:", e)
-        return pd.DataFrame()
-
-
-def get_historical_cg(coin_id, hours=3):
-    try:
-        now = int(time.time())
-        past = now - hours * 3600
-        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart/range"
-        params = {"vs_currency": "usd", "from": str(past), "to": str(now)}
-        r = requests.get(url, params=params, timeout=10)
-
-        if r.status_code != 200:
-            st.write("CoinGecko chart status:", r.status_code, r.text[:200])
-            return pd.DataFrame()
-
-        data = r.json()
-        if "prices" not in data:
-            st.write("CoinGecko chart pa 'prices':", data)
-            return pd.DataFrame()
-
-        df = pd.DataFrame(data["prices"], columns=["time", "price"])
-        df["time"] = pd.to_datetime(df["time"], unit="ms")
-        df.set_index("time", inplace=True)
-        return df
-
-    except Exception as e:
-        st.write("Gabim CoinGecko chart:", e)
+        st.write("Gabim Binance kline:", e)
         return pd.DataFrame()
 
 
@@ -168,26 +115,19 @@ def classify_signal(s):
 coin_label = st.selectbox("💎 Zgjidh monedhën:", list(COINS.keys()))
 symbol, cg_id = COINS[coin_label]
 
-# Çmimi aktual (Bybit ose CG) – me kontroll None
-price = get_current_bybit(symbol)
-source = "Bybit"
+# Çmimi aktual (Binance)
+price = get_current_price(symbol)
+source = "Binance"
 
 if price is None:
-    price = get_current_cg(cg_id)
-    source = "CoinGecko"
-
-if price is None:
-    st.error("❌ Nuk mund të merren të dhëna as nga Bybit, as nga CoinGecko.")
+    st.error("❌ Nuk mund të merren të dhëna nga Binance.")
     st.stop()
 
-# Historiku
-df = get_historical_bybit(symbol)
-if df.empty:
-    df = get_historical_cg(cg_id, hours=3)
-    source = "CoinGecko (fallback)"
+# Historiku nga Binance
+df = get_historical_binance(symbol, interval="1m", limit=180)
 
 if df.empty:
-    st.warning("⚠️ Nuk u gjetën të dhëna historike.")
+    st.warning("⚠️ Nuk u gjetën të dhëna historike nga Binance.")
     st.stop()
 
 # ======================== INDIKATORËT ========================
@@ -267,12 +207,10 @@ st.dataframe(df.tail(10)[[
 st.markdown("---")
 st.header("📦 Portofoli im")
 
-# Marrim çmimet aktuale për të gjitha monedhat
+# Marrim çmimet aktuale për të gjitha monedhat (Binance)
 prices_now = {}
 for label, (sym, cg) in COINS.items():
-    p = get_current_bybit(sym)
-    if p is None:
-        p = get_current_cg(cg)
+    p = get_current_price(sym)
     prices_now[label] = p
 
 # Ruajmë sasitë në session_state
