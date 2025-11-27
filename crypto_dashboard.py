@@ -15,6 +15,7 @@ COINS = {
     "🐕 Shiba Inu": ("SHIBUSDT", "shiba-inu"),
     "⚡ Verge (XVG)": ("XVGUSDT", "verge")
 }
+
 st.set_page_config(page_title="ElbuharBot PRO – Hybrid Edition", layout="wide")
 
 # 🎨 Stil Neon
@@ -39,37 +40,74 @@ def get_current_bybit(symbol):
         url = "https://api.bybit.com/v5/market/tickers"
         params = {"category": "spot", "symbol": symbol}
         r = requests.get(url, params=params, timeout=10)
+
+        if r.status_code != 200:
+            st.write("Bybit status:", r.status_code, r.text[:200])
+            return None
+
         data = r.json()
-        if "result" in data and "list" in data["result"]:
+        if "result" in data and data["result"].get("list"):
             return float(data["result"]["list"][0]["lastPrice"])
-    except:
+
+        st.write("Bybit përgjigje pa 'list':", data)
         return None
-    return None
+
+    except Exception as e:
+        st.write("Gabim Bybit:", e)
+        return None
+
 
 def get_current_cg(coin_id):
     try:
-        url = f"https://api.coingecko.com/api/v3/simple/price"
-        r = requests.get(url, params={"ids": coin_id, "vs_currencies": "usd"}, timeout=10)
+        url = "https://api.coingecko.com/api/v3/simple/price"
+        params = {"ids": coin_id, "vs_currencies": "usd"}
+        r = requests.get(url, params=params, timeout=10)
+
+        if r.status_code != 200:
+            st.write("CoinGecko status:", r.status_code, r.text[:200])
+            return None
+
         data = r.json()
-        return float(data[coin_id]["usd"])
-    except:
+        if coin_id in data and "usd" in data[coin_id]:
+            return float(data[coin_id]["usd"])
+
+        st.write("CoinGecko përgjigje e çuditshme:", data)
         return None
+
+    except Exception as e:
+        st.write("Gabim CoinGecko:", e)
+        return None
+
 
 def get_historical_bybit(symbol, limit=180):
     try:
         url = "https://api.bybit.com/v5/market/kline"
         params = {"category": "spot", "symbol": symbol, "interval": "1", "limit": limit}
         r = requests.get(url, params=params, timeout=10)
+
+        if r.status_code != 200:
+            st.write("Bybit kline status:", r.status_code, r.text[:200])
+            return pd.DataFrame()
+
         data = r.json()
         if "result" not in data or "list" not in data["result"]:
+            st.write("Bybit kline pa 'list':", data)
             return pd.DataFrame()
-        df = pd.DataFrame(data["result"]["list"], columns=["time","open","high","low","close","volume"])
-        df["time"] = pd.to_datetime(df["time"], unit="s")
+
+        df = pd.DataFrame(
+            data["result"]["list"],
+            columns=["time", "open", "high", "low", "close", "volume"]
+        )
+        # Bybit jep ms -> përdor unit="ms"
+        df["time"] = pd.to_datetime(df["time"], unit="ms")
         df["price"] = df["close"].astype(float)
-        df = df[["time","price"]].set_index("time").sort_index()
+        df = df[["time", "price"]].set_index("time").sort_index()
         return df
-    except:
+
+    except Exception as e:
+        st.write("Gabim Bybit kline:", e)
         return pd.DataFrame()
+
 
 def get_historical_cg(coin_id, hours=3):
     try:
@@ -78,45 +116,67 @@ def get_historical_cg(coin_id, hours=3):
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart/range"
         params = {"vs_currency": "usd", "from": str(past), "to": str(now)}
         r = requests.get(url, params=params, timeout=10)
+
+        if r.status_code != 200:
+            st.write("CoinGecko chart status:", r.status_code, r.text[:200])
+            return pd.DataFrame()
+
         data = r.json()
         if "prices" not in data:
+            st.write("CoinGecko chart pa 'prices':", data)
             return pd.DataFrame()
-        df = pd.DataFrame(data["prices"], columns=["time","price"])
+
+        df = pd.DataFrame(data["prices"], columns=["time", "price"])
         df["time"] = pd.to_datetime(df["time"], unit="ms")
         df.set_index("time", inplace=True)
         return df
-    except:
+
+    except Exception as e:
+        st.write("Gabim CoinGecko chart:", e)
         return pd.DataFrame()
+
 
 def generate_signal(row):
     s = 0
     if pd.notna(row.rsi):
-        if row.rsi < 30: s += 1
-        elif row.rsi > 70: s -= 1
+        if row.rsi < 30:
+            s += 1
+        elif row.rsi > 70:
+            s -= 1
     if pd.notna(row.ema12) and pd.notna(row.ema26):
         s += 1 if row.ema12 > row.ema26 else -1
     if pd.notna(row.macd) and pd.notna(row.macd_signal):
         s += 2 if row.macd > row.macd_signal else -2
     if pd.notna(row.price) and pd.notna(row.boll_upper) and pd.notna(row.boll_lower):
-        s += 1 if row.price < row.boll_lower else -1 if row.price > row.boll_upper else 0
+        if row.price < row.boll_lower:
+            s += 1
+        elif row.price > row.boll_upper:
+            s -= 1
     return s
 
+
 def classify_signal(s):
-    if s >= 3: return "🟢 BLI"
-    elif s <= -3: return "🔴 SHIT"
-    else: return "🟡 MBANJ"
+    if s >= 3:
+        return "🟢 BLI"
+    elif s <= -3:
+        return "🔴 SHIT"
+    else:
+        return "🟡 MBANJ"
+
 
 # ======================== UI ========================
 coin_label = st.selectbox("💎 Zgjidh monedhën:", list(COINS.keys()))
 symbol, cg_id = COINS[coin_label]
 
-# Çmimi aktual (Bybit ose CG)
+# Çmimi aktual (Bybit ose CG) – me kontroll None
 price = get_current_bybit(symbol)
 source = "Bybit"
-if not price:
+
+if price is None:
     price = get_current_cg(cg_id)
     source = "CoinGecko"
-if not price:
+
+if price is None:
     st.error("❌ Nuk mund të merren të dhëna as nga Bybit, as nga CoinGecko.")
     st.stop()
 
@@ -134,10 +194,12 @@ if df.empty:
 df["rsi"] = RSIIndicator(df["price"]).rsi()
 df["ema12"] = EMAIndicator(df["price"], 12).ema_indicator()
 df["ema26"] = EMAIndicator(df["price"], 26).ema_indicator()
+
 macd = MACD(df["price"])
 df["macd"] = macd.macd()
 df["macd_signal"] = macd.macd_signal()
 df["macd_histogram"] = macd.macd_diff()
+
 bb = BollingerBands(df["price"])
 df["boll_upper"] = bb.bollinger_hband()
 df["boll_lower"] = bb.bollinger_lband()
@@ -147,54 +209,73 @@ df["signal_text"] = df["signal"].apply(classify_signal)
 last = df.iloc[-1]
 sig = last.signal_text
 color = "lime" if "BLI" in sig else "red" if "SHIT" in sig else "yellow"
-prob_up = min(95, max(5, 50 + last.signal * 10 + random.randint(-5,5)))
+prob_up = min(95, max(5, 50 + last.signal * 10 + random.randint(-5, 5)))
 
 # ======================== SINJALI ========================
 st.markdown(f"<div class='neon' style='color:{color};'>{sig}</div>", unsafe_allow_html=True)
 st.caption(f"📡 Burim: {source}")
+
 col1, col2 = st.columns(2)
 col1.metric("💵 Çmimi aktual", f"${price:.6f}")
 col2.metric("📈 Mundësia për ngritje", f"{prob_up}%")
 
 # ======================== GRAFIKU ========================
 fig = make_subplots(
-    rows=3, cols=1, shared_xaxes=True, row_heights=[0.5,0.25,0.25],
+    rows=3, cols=1, shared_xaxes=True, row_heights=[0.5, 0.25, 0.25],
     subplot_titles=(f"{coin_label} – Çmimi & EMA", "RSI", "MACD")
 )
-fig.add_trace(go.Scatter(x=df.index, y=df["price"], name="Çmimi", line=dict(color="#00E5FF", width=2)))
-fig.add_trace(go.Scatter(x=df.index, y=df["ema12"], name="EMA12", line=dict(color="#FFA500")))
-fig.add_trace(go.Scatter(x=df.index, y=df["ema26"], name="EMA26", line=dict(color="#9400D3")))
-fig.add_trace(go.Scatter(x=df.index, y=df["rsi"], name="RSI", line=dict(color="teal")), row=2, col=1)
+
+fig.add_trace(go.Scatter(x=df.index, y=df["price"], name="Çmimi",
+                         line=dict(color="#00E5FF", width=2)))
+fig.add_trace(go.Scatter(x=df.index, y=df["ema12"], name="EMA12",
+                         line=dict(color="#FFA500")))
+fig.add_trace(go.Scatter(x=df.index, y=df["ema26"], name="EMA26",
+                         line=dict(color="#9400D3")))
+
+fig.add_trace(go.Scatter(x=df.index, y=df["rsi"], name="RSI",
+                         line=dict(color="teal")), row=2, col=1)
 fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
 fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
-fig.add_trace(go.Scatter(x=df.index, y=df["macd"], name="MACD", line=dict(color="blue")), row=3, col=1)
-fig.add_trace(go.Scatter(x=df.index, y=df["macd_signal"], name="MACD Signal", line=dict(color="orange")), row=3, col=1)
-fig.add_trace(go.Bar(x=df.index, y=df["macd_histogram"], name="Histogram", marker_color="gray"), row=3, col=1)
+
+fig.add_trace(go.Scatter(x=df.index, y=df["macd"], name="MACD",
+                         line=dict(color="blue")), row=3, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=df["macd_signal"], name="MACD Signal",
+                         line=dict(color="orange")), row=3, col=1)
+fig.add_trace(go.Bar(x=df.index, y=df["macd_histogram"], name="Histogram",
+                     marker_color="gray"), row=3, col=1)
 fig.add_hline(y=0, line_dash="dash", line_color="white", row=3, col=1)
-fig.update_layout(height=900, paper_bgcolor="black", plot_bgcolor="black", font=dict(color="white"))
+
+fig.update_layout(
+    height=900,
+    paper_bgcolor="black",
+    plot_bgcolor="black",
+    font=dict(color="white")
+)
+
 st.plotly_chart(fig, use_container_width=True)
 
 # ======================== TABELA ========================
 st.subheader("📊 Të dhënat e fundit (10 rreshta)")
 st.dataframe(df.tail(10)[[
     "price", "rsi", "ema12", "ema26",
-    "macd", "macd_signal", "boll_upper",
-    "boll_lower", "signal_text"
+    "macd", "macd_signal",
+    "boll_upper", "boll_lower",
+    "signal_text"
 ]])
 
 # ======================== PORTOFOLI ========================
 st.markdown("---")
 st.header("📦 Portofoli im")
 
-# Marrim çmimet aktuale për të gjitha monedhat e portofolit
+# Marrim çmimet aktuale për të gjitha monedhat
 prices_now = {}
 for label, (sym, cg) in COINS.items():
     p = get_current_bybit(sym)
-    if not p:
+    if p is None:
         p = get_current_cg(cg)
     prices_now[label] = p
 
-# Ruajmë sasitë në session_state që të mos humbin me çdo refresh
+# Ruajmë sasitë në session_state
 if "portfolio" not in st.session_state:
     st.session_state["portfolio"] = {label: 0.0 for label in COINS.keys()}
 
@@ -212,7 +293,7 @@ for i, (label, (sym, cg)) in enumerate(COINS.items()):
         )
         st.session_state["portfolio"][label] = qty
         price_now = prices_now[label]
-        if price_now:
+        if price_now is not None:
             st.caption(f"Çmimi: ${price_now:.8f}")
         else:
             st.caption("❌ Pa çmim aktual")
@@ -241,16 +322,16 @@ st.subheader("📊 Portofoli – Vlera aktuale")
 st.dataframe(port_df)
 st.metric("💰 Vlera totale e portofolit", f"${total_value:,.2f}")
 
-# 🎯 Sinjali i lidhur me portofolin për monedhën e zgjedhur
+# 🎯 Sinjali për monedhën e zgjedhur, lidhur me portofolin
 st.subheader("🎯 Sinjali për portofolin tënd")
 qty_current_coin = st.session_state["portfolio"].get(coin_label, 0.0)
 
 if qty_current_coin > 0:
     st.write(f"Ke **{qty_current_coin}** nga {coin_label}.")
     if "BLI" in sig:
-        st.write("Sinjali është **BLI** – nëse beson algoritmin, mund të mendosh për rritje pozicioni (me kujdes).")
+        st.write("Sinjali është **BLI** – mund të mendosh për rritje pozicioni (me strategji të kujdesshme).")
     elif "SHIT" in sig:
-        st.write("Sinjali është **SHIT** – ndoshta ia vlen të mbyllësh një pjesë të pozicionit, sipas strategjisë tënde.")
+        st.write("Sinjali është **SHIT** – mund të mendosh për mbyllje të një pjese të pozicionit.")
     else:
         st.write("Sinjali është **MBANJ** – as blerje agresive, as shitje agresive.")
 else:
@@ -259,7 +340,11 @@ else:
 # ======================== TIMER ========================
 ph = st.empty()
 for s in range(REFRESH_INTERVAL, 0, -1):
-    ph.markdown(f"<div class='countdown'>⏳ Rifreskim pas {s} sekondash...</div>", unsafe_allow_html=True)
+    ph.markdown(
+        f"<div class='countdown'>⏳ Rifreskim pas {s} sekondash...</div>",
+        unsafe_allow_html=True
+    )
     time.sleep(1)
+
 ph.empty()
 st.rerun()
