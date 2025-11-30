@@ -264,26 +264,37 @@ SL = entry × (1 + SL%)
 - Hedging të sigurt  
 """)
 
-# ===================== SQARIMI FINAL POSHTË FAQES ========================
+# ===================== SQARIMI FINAL – KARTË PREMIUM POSHTË FAQES ========================
 st.markdown("<hr>", unsafe_allow_html=True)
+
 st.markdown("""
-# 🧩 **SQARIMI FINAL – SI FITON STRATEGJIA ELBUNI**
+<div class="elb-card" style="
+    margin-top: 20px;
+    border-color: rgba(250, 204, 21, 0.6);
+    box-shadow: 0 0 25px rgba(250, 204, 21, 0.35);
+">
+  <div class="elb-title" style="font-size: 26px; margin-bottom: 10px;">
+    🧩 SQARIMI FINAL – SI FITON STRATEGJIA ELBUNI
+  </div>
+  <div style="font-size: 15px; color: #e5e7eb; line-height: 1.6;">
+    <b>🔥 Fiton edhe kur bie – edhe kur ngrihet</b><br/>
+    • Në <b>TP (rënia)</b> → FUTURES fiton, SPOT humbet pak → TI fiton coin.<br/>
+    • Në <b>SL (ngritja)</b> → SPOT fiton shumë, FUTURES humb pak → TI del afër zeros ose në fitim të vogël.<br/><br/>
 
-### 🔥 Fiton edhe kur bie – edhe kur ngrihet
-- Në **TP (rënia)** → FUTURES fiton, SPOT humbet pak → TI fiton coin.  
-- Në **SL (ngritja)** → SPOT fiton shumë, FUTURES humb pak → TI del afër zeros ose fitim i vogël.
+    <b>🟩 Pse është e fuqishme?</b><br/>
+    ✔ Shton coin në çdo cikël<br/>
+    ✔ Fiton kur rikthehet çmimi në 0%<br/>
+    ✔ Leverage 2x është shumë i sigurt krahasuar me 5x / 10x<br/>
+    ✔ Mbrojtje ndaj luhatjeve të forta të tregut<br/>
+    ✔ Rrezik i ulët për likuidim kur menaxhohet siç duhet<br/><br/>
 
-### 🟩 Pse është e fuqishme?
-✔ Shton coin në çdo cikël  
-✔ Fiton kur rikthehet çmimi  
-✔ Leverage 2x është shumë i sigurt  
-✔ Mbrojtje ndaj luhatjeve  
-✔ Jo risk për likuidim në lev 2x  
+    <b>🎯 Rezultati afatgjatë:</b><br/>
+    🔵 TP të vogla dhe të shpeshta → fitim i qëndrueshëm + shtim i coinit<br/>
+    🔵 SL të rralla dhe të buta → humbje të vogla, shpesh afër zeros<br/>
+    🔵 Cikli total → kapitali yt rritet me risk të kontrolluar, jo me kumar.<br/><br/>
 
-### 🎯 Rezultati afatgjatë:
-🔵 *TP të vogla* → FITIM dhe shtim coini  
-🔵 *SL të rralla* → HUMBJE të vogla ose zero  
-🔵 *Cikli total* → Kapital që rritet me risk minimal  
-
-Kjo është **strategjia më e balancuar**, më profesionale dhe më e sigurt për hedging në kripto.  
-""")
+    Kjo e bën <b>ElBuni Strategy</b> një nga strategjitë më të balancuara, profesionale dhe të sigurta për hedging në kripto,
+    kur përdoret me disiplinë dhe respektim të TP / SL dhe menaxhimit të levës.
+  </div>
+</div>
+""", unsafe_allow_html=True)
