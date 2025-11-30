@@ -96,7 +96,7 @@ with tab_calc:
             "⚙️ Leverage Futures (x)",
             min_value=1.0,
             max_value=10.0,
-            value=3.0,
+            value=2.0,   # mund ta ndryshosh si të duash, manuali është shembull me 2x
             step=0.5
         )
 
@@ -318,7 +318,7 @@ with tab_calc:
 
 # ======================== TAB 2: MANUALI ========================
 with tab_manual:
-    st.markdown("## 📘 Manuali i Strategjisë ElBuni")
+    st.markdown("## 📘 Manuali i Strategjisë ElBuni (shembull me lev 2x)")
 
     st.markdown("""
 ### 1️⃣ Çfarë është ElBuni Strategy?
@@ -330,25 +330,30 @@ Strategji hedging ku ti kombinon:
 
 Qëllimi:
 - Të fitosh kur çmimi bie (përmes futures short)
-- Të humbasësh sa më pak kur çmimi rritet (se ke SPOT)
+- Të humbasësh sa më pak kur çmimi rritet (sepse ke SPOT)
 - Të kesh kontroll mbi **TP (Take Profit)** dhe **SL (Stop Loss)**
 
 ---
 
-### 2️⃣ Si ndahet kapitali?
+### 2️⃣ Si ndahet kapitali? (shembull me lev 2x)
 
 Ti zgjedh:
 
 - **SPOT %** → p.sh. 70%
 - **FUTURES %** → pjesa tjetër (p.sh. 30%)
-- **Leverage** → p.sh. 2x
+- **Leverage** → këtu po marrim shembull **2x**
 
-Shembull:
+Shembull konkret:
 
-- Kapitali: 5,000 USDT
-- SPOT 70% → 3,500 USDT
-- FUTURES 30% → 1,500 USDT
-- Leverage 3x → short total = 4,500 USDT
+- Kapitali: **5,000 USDT**
+- SPOT 70% → **3,500 USDT**
+- FUTURES 30% → **1,500 USDT**
+- Leverage **2x** → short total = **3,000 USDT** (1,500 × 2)
+
+Pra:
+
+- 3,500 USDT punojnë si SPOT
+- 3,000 USDT pozicion i hapur si SHORT në futures (me margin 1,500 USDT)
 
 ---
 
@@ -356,13 +361,23 @@ Shembull:
 
 Çmimi bie p.sh. **−2%** (TP i short-it):
 
-- SPOT humbet një pjesë (se bie çmimi)
-- FUTURES SHORT fiton (se ke short)
+- SPOT humbet një pjesë (sepse bie çmimi)
+- FUTURES SHORT fiton (sepse je short)
 
-Fitimi i futures **hedhet në SPOT**, pastaj kur çmimi kthehet prapë në 0%, ti ke:
+Në këtë shembull:
 
-- më shumë coin në SPOT
-- plus një fitim total në USDT
+- SPOT 3,500 USDT → bie 2% → humb rreth **70 USDT**
+- FUTURES 3,000 USDT short → fiton rreth **60 USDT**
+
+Rezultati:
+
+- Humbje shumë e vogël neto në USDT, por:
+- Fiton coin-a shtesë, nëse fitimin e futures e hedh në SPOT në çmimin e rënies.
+
+Pastaj, kur çmimi kthehet prapë në 0%, ti ke:
+
+- më shumë coin në SPOT,
+- kapitali total mund të jetë shumë afër shumës fillestare, por me **pozicion më të fortë në sasi coini**.
 
 ---
 
@@ -370,17 +385,22 @@ Fitimi i futures **hedhet në SPOT**, pastaj kur çmimi kthehet prapë në 0%, t
 
 Çmimi rritet p.sh. **+6%** (SL):
 
-- SPOT fiton (se çmimi rritet)
-- FUTURES SHORT humb (se short-i shkon kundër teje)
+- SPOT fiton (sepse çmimi rritet)
+- FUTURES SHORT humb (sepse short-i shkon kundër teje)
 
-Rezultati neto është:
+Në shembullin me 70/30 dhe lev 2x:
 
-- një humbje e vogël/profit i vogël në total (varësisht nga SPOT%, FUTURES% dhe leverage)
+- SPOT 3,500 USDT → +6% → fiton rreth **210 USDT**
+- FUTURES 3,000 USDT short → humb rreth **180 USDT**
 
-Ti vet zgjedh sa % SL dëshiron, në mënyrë që:
+Rezultati:
 
-- humbja maksimale në tërësi të jetë e pranueshme për ty
-- SPOT fiton një pjesë të humbjes së futures
+- Fitim neto rreth **+30 USDT**
+- Kapitali total është pak **mbi** shumën fillestare
+
+Pra me lev **2x**, strategjia është më e butë:
+- në rritje të forta → prapë mund të dalësh pak në fitim ose shumë afër zeros
+- në rënie → humbja neto në USDT është e vogël, ndërsa fiton coin-a shtesë kur e hedh fitimin e futures te SPOT.
 
 ---
 
@@ -388,64 +408,68 @@ Ti vet zgjedh sa % SL dëshiron, në mënyrë që:
 
 Kur jep:
 
-- **Çmimin hyrës (entry)**
-- **TP (−%)**
-- **SL (+%)**
+- **Çmimin hyrës (entry)**,
+- **TP (−%)**,
+- **SL (+%)**,
 
-App-i llogarit automatikisht:
+app-i llogarit automatikisht:
 
-- **Çmimin TP** → entry × (1 − TP%)
-- **Çmimin SL** → entry × (1 + SL%)
+- **Çmimin TP** → `entry × (1 − TP%)`
+- **Çmimin SL** → `entry × (1 + SL%)`
 
-Këto dalin sipër si numra me 12 decimale, gati për t'u kopjuar direkt në Binance Futures.
+Këto çmime dalin sipër si numra me 12 decimale, gati për t'u kopjuar direkt në Binance Futures.
 
 ---
 
-### 6️⃣ Ku është “edge” i strategjisë?
+### 6️⃣ Ku është “edge” i strategjisë me lev 2x?
 
-Strategjia ka avantazh kur:
+Me lev **2x**, strategjia për 70/30 ka këtë logjikë:
 
-- tregu lëviz shpesh **−TP%** (lëvizje të vogla poshtë)
-- dhe më rrallë bën **+SL%** pa pullback
+- Kur çmimi **rritet** → SPOT fiton pak më shumë se humb FUTURES  
+  → në skenar SL, shpesh mund të jesh pak në **fitim** ose shumë afër zeros.
+
+- Kur çmimi **bie** → FUTURES fiton, SPOT humbet pak më shumë  
+  → në skenar TP, humbja neto në USDT është shumë e vogël, por ti fiton **më shumë coin**.
 
 Pra:
 
-- shumë herë prek TP → fitim i vogël, i sigurt
-- pak herë prek SL → humbje pak më të madhe, por e rrallë
+> **Avantazhi** është: ti shton sasinë e coinit në rënie, ndërsa nuk digjesh shumë në rritje të forta, sidomos me lev 2x dhe SL të zgjuar.
 
 Nëse ti e lidh këtë me:
 
-- sinjalet (RSI, Bollinger, overbought)
-- filtrat e trendit (mos short në super bull afatgjatë)
+- sinjale teknike (RSI, Bollinger, overbought/oversold),
+- filtrat e trendit (mos short në super bull afatgjatë),
 
-atëherë **mesatarja afatgjatë** të del pozitive.
+atëherë mesatarja afatgjatë të del shumë më e sigurt se një short agresiv me lev 5x–10x.
 
 ---
 
 ### 7️⃣ Si ta përdorësh në praktikë?
 
-1. Zgjidh coin-in në Binance (shpesh meme/alt që lëviz shumë).
-2. Vendos:
-   - Investimin total
-   - SPOT %, FUTURES %, Leverage
-   - TP (−%) sipas targetit tënd (p.sh. −2%, −3%)
-   - SL (+%) sipas riskut që pranon (p.sh. +6%, +8%, +10%)
-3. Shëno **çmimin entry** (nga Binance).
-4. Kopjo **çmimin TP** dhe **çmimin SL** nga app-i dhe vendosi te order-at në Binance.
-5. Lexo përmbledhjen në fund të kalkulatorit:
+1. Zgjidh coinin në Binance (shpesh meme/alt që lëviz shumë).
+2. Në kalkulator (tabi i parë):
+   - Vendos **Investimin total**
+   - Zgjidh **SPOT %** dhe **FUTURES %**
+   - Vendos **Leverage** (p.sh. 2x si në shembull, ose sa do ti)
+   - Cakto **TP (−%)** dhe **SL (+%)** sipas riskut tënd
+3. Shkruaj **çmimin entry** si në Binance.
+4. Kopjo **çmimin TP** dhe **çmimin SL** nga app-i → vendosi tek pozicioni yt në Binance Futures.
+5. Shiko përmbledhjen në fund të kalkulatorit:
    - sa ke futur
    - sa del në skenarin TP
    - sa del në skenarin SL
-   - sa fitim/humbje ke në tërësi për secilin skenar.
+   - sa fitim/humbje ke në total, në USDT dhe në coin.
 
 ---
 
-### 8️⃣ Këshilla personale (si përdorues pro i ElBuni-t)
+### 8️⃣ Këshilla praktike me lev 2x
 
-- Mos e përdor short-in 24/7 – përdore si “snajper”, kur coin është i fryrë (overbought).
-- Përshtat TP/SL dhe leverage sipas llojit të coinit (BTC ≠ PEPE).
-- Testoje fillimisht me shuma të vogla derisa ta ndjesh si sillet në treg.
-- Kujto se strategjia **nuk e eliminon rrezikun**, vetëm e menaxhon dhe e bën më të parashikueshëm.
+- Lev **2x** është shumë më i sigurt se 3x, 5x, 10x – lë vend që tregu të “marrë frymë”.
+- Në rritje të forta, strategjia nuk shemb kapitalin, por shpesh nxjerr edhe fitim të vogël.
+- Përdore më shumë si **hedging inteligjent**, jo si kumar:
+  - hyr nga sinjale të mira, jo rastësisht
+  - mos e përdor 24/7 pa filtra
+  - testoje fillimisht me shumë më të vogla.
 
-Kaq është dritarja e manualit – mund ta lexosh sa herë që dëshiron pa prishur kalkulatorin.
+Ky manual është guida jote – kalkulatori në tabin tjetër gjithmonë të tregon saktë numrat për konfigurimin që zgjedh.
 """)
