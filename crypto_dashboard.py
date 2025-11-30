@@ -39,6 +39,10 @@ st.markdown("""
     font-size: 22px;
     font-weight: 700;
 }
+[data-testid="stDataFrame"] {
+    border-radius: 12px;
+    overflow: hidden;
+}
 .copy-btn {
     margin-top: 8px;
     padding: 4px 10px;
@@ -51,10 +55,6 @@ st.markdown("""
 }
 .copy-btn:hover {
     box-shadow: 0 0 14px rgba(34, 197, 94, 0.8);
-}
-[data-testid="stDataFrame"] {
-    border-radius: 12px;
-    overflow: hidden;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -80,7 +80,7 @@ if uploaded_logo is not None:
 else:
     st.markdown("### 💹 ElBuni Strategy PRO")
 
-# ❌ Heqim komplet tekstin nën logo
+# Fshirë teksti – clean header
 st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
 # ======================== TABS ========================
@@ -151,23 +151,21 @@ with tab_calc:
         tp_price = price_entry * (1 - tp_down_percent/100)
         sl_price = price_entry * (1 + sl_up_percent/100)
 
-        st.markdown("### 💲 Çmimet que shkruan në Binance")
+        st.markdown("### 💲 Çmimet për Binance")
 
         ct1, ct2 = st.columns(2)
 
         with ct1:
-            st.markdown('<div class="elb-card">', unsafe_allow_html=True)
-            st.markdown('<div class="metric-label">📉 Çmimi TP</div>', unsafe_allow_html=True)
+            st.markdown('<div class="elb-card">📉 Çmimi TP</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="metric-value">{tp_price:.12f}</div>', unsafe_allow_html=True)
 
         with ct2:
-            st.markdown('<div class="elb-card">', unsafe_allow_html=True)
-            st.markdown('<div class="metric-label">📈 Çmimi SL</div>', unsafe_allow_html=True)
+            st.markdown('<div class="elb-card">📈 Çmimi SL</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="metric-value">{sl_price:.12f}</div>', unsafe_allow_html=True)
 
     st.markdown("---")
 
-    # ======================== LLOGARITJET TP & SL ========================
+    # ======================== LLOGARITJET ========================
     if investimi_total > 0:
 
         spot_cap = investimi_total * spot_pct / 100
@@ -207,7 +205,6 @@ with tab_calc:
             "Totali final": total_final_tp,
             "P&L final": pnl_total_tp
         }])
-
         st.dataframe(tp_df, use_container_width=True)
 
         st.markdown("### 📕 SL – ngritja +%")
@@ -222,7 +219,6 @@ with tab_calc:
             "Totali final": total_sl,
             "P&L final": pnl_sl
         }])
-
         st.dataframe(sl_df, use_container_width=True)
 
 # ======================== TAB 2: MANUALI ========================
@@ -231,60 +227,62 @@ with tab_manual:
 
     st.markdown("""
 ### 1️⃣ Çfarë është ElBuni Strategy?
-Strategji hedging ku kombinon:
-- **SPOT**
-- **FUTURES SHORT**
+Një strategji e balancuar SPOT + FUTURES SHORT ku fiton:
+- Kur bie çmimi
+- Kur rritet çmimi
+- Kur kthehet në 0% (fiton coin)
 
----
-
-### 2️⃣ Shembull me lev 2x
-- Investim: 5000 USDT  
-- SPOT: 3500  
-- FUTURES: 1500 → lev 2x = 3000 short
-
----
+### 2️⃣ Struktura bazë
+- SPOT: 70%
+- FUTURES: 30%
+- Leverage: 2x
 
 ### 3️⃣ Çfarë ndodh në TP?
-- SPOT humbet pak  
-- FUTURES fiton  
-- Fitimi i futures hidhet te SPOT  
-- Kur ngjitet në 0% → ke **më shumë coin**
-
----
+FUTURES fiton  
+SPOT humbet pak  
+Fitimi i futures hidhet te SPOT  
+Rezultat → më shumë coin kur kthehet çmimi në 0%
 
 ### 4️⃣ Çfarë ndodh në SL?
-- SPOT fiton  
-- FUTURES humb  
-- Me lev 2x zakonisht del **afër zeros** ose **pak fitim**
+SPOT fiton shumë  
+FUTURES humb  
+Me lev 2x → zakonisht afër zeros ose fitim i vogël
 
----
+### 5️⃣ Avantazhet
+- TP shumë i lehtë për t’u kapur  
+- SL i butë  
+- Shton coin në çdo cikël  
+- Mbrojtje ndaj luhatjeve
 
-### 5️⃣ Formulat
-- **TP = entry × (1 − TP%)**  
-- **SL = entry × (1 + SL%)**
+### 6️⃣ Formula TP / SL
+TP = entry × (1 − TP%)  
+SL = entry × (1 + SL%)
 
----
+### 7️⃣ Ideal për:
+- Treg me valë  
+- Luhatje të shpeshta  
+- Hedging të sigurt  
+""")
 
-### 6️⃣ Avantazhi
-- Lev 2x është i butë  
-- Jo rrezik likuidimi  
-- Shton coin në ciklet e rënies  
-- SL është shpesh i lehtë
+    # ===================== SQARIMI FINAL PRO ========================
+    st.markdown("""
+# 🧩 **SQARIMI FINAL – SI FITON STRATEGJIA ELBUNI**
 
----
+### 🔥 Fiton edhe kur bie – edhe kur ngrihet
+- Në **TP (rënia)** → FUTURES fiton, SPOT humbet pak → TI fiton coin.  
+- Në **SL (ngritja)** → SPOT fiton shumë, FUTURES humb pak → TI del afër zeros ose fitim i vogël.
 
-### 7️⃣ Udhëzime pune
-1. Vendos investimin  
-2. Zgjidh SPOT / FUTURES  
-3. Vendos lev  
-4. Vendos entry  
-5. Kopjo TP & SL  
-6. Kontrollo tabelat
+### 🟩 Pse është e fuqishme?
+✔ Shton coin në çdo cikël  
+✔ Fiton kur rikthehet çmimi  
+✔ Leverage 2x është shumë i sigurt  
+✔ Mbrojtje ndaj luhatjeve  
+✔ Jo risk për likuidim në lev 2x  
 
----
+### 🎯 Rezultati afatgjatë:
+🔵 *TP të vogla* → FITIM dhe shtim coini  
+🔵 *SL të rralla* → HUMBJE të vogla ose zero  
+🔵 *Cikli total* → Kapital që rritet me risk minimal
 
-### 8️⃣ Këshilla
-- Mos e përdor në super-bull  
-- Ideal për treg me valë  
-- Testo me sasi të vogla  
+Kjo është **strategjia më e balancuar**, më profesionale dhe më e sigurt për hedging në kripto.  
 """)
