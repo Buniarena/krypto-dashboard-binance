@@ -4,7 +4,7 @@ from PIL import Image
 
 # ======================== KONFIGURIMI BAZË ========================
 st.set_page_config(
-    page_title="ElBuni Strategy PRO – TP & SL + Binance Prices + Manual",
+    page_title="ElBuni Strategy PRO – TP & SL + Manual",
     page_icon="💹",
     layout="wide"
 )
@@ -80,17 +80,8 @@ if uploaded_logo is not None:
 else:
     st.markdown("### 💹 ElBuni Strategy PRO")
 
-st.markdown("""
-<div class="elb-card">
-    <div class="elb-title">💹 ElBuni Strategy PRO</div>
-    <div style="font-size:15px;color:#cbd5f5;">
-        Kalkulator + Manual për strategjinë hedging: SPOT + FUTURES SHORT, TP & SL, dhe çmimet gati për Binance.
-        <br/>Përdor tabat më poshtë për të llogaritur dhe për të lexuar shpjegimin e plotë.
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-st.markdown("")
+# ❌ Heqim komplet tekstin nën logo
+st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
 # ======================== TABS ========================
 tab_calc, tab_manual = st.tabs(["🧮 Kalkulatori", "📘 Manuali i Strategjisë"])
@@ -160,7 +151,7 @@ with tab_calc:
         tp_price = price_entry * (1 - tp_down_percent/100)
         sl_price = price_entry * (1 + sl_up_percent/100)
 
-        st.markdown("### 💲 Çmimet që shkruan në Binance")
+        st.markdown("### 💲 Çmimet que shkruan në Binance")
 
         ct1, ct2 = st.columns(2)
 
@@ -173,9 +164,6 @@ with tab_calc:
             st.markdown('<div class="elb-card">', unsafe_allow_html=True)
             st.markdown('<div class="metric-label">📈 Çmimi SL</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="metric-value">{sl_price:.12f}</div>', unsafe_allow_html=True)
-
-    else:
-        st.info("Shkruaj entry > 0")
 
     st.markdown("---")
 
@@ -239,76 +227,64 @@ with tab_calc:
 
 # ======================== TAB 2: MANUALI ========================
 with tab_manual:
-    st.markdown("## 📘 Manuali i Strategjisë ElBuni (shembull me lev 2x)")
+    st.markdown("## 📘 Manuali i Strategjisë ElBuni (lev 2x)")
 
     st.markdown("""
 ### 1️⃣ Çfarë është ElBuni Strategy?
-
-Strategji hedging ku ti kombinon:
-
-- **SPOT** (blerje normale)
-- **FUTURES SHORT** (parashikon rënie)
-
-Qëllimi:
-- Fiton kur bie çmimi
-- Fiton coin kur kthehet në 0%
-- Humbja në rritje kontrollohet nga SPOT
+Strategji hedging ku kombinon:
+- **SPOT**
+- **FUTURES SHORT**
 
 ---
 
 ### 2️⃣ Shembull me lev 2x
-- Investimi: **5000 USDT**
-- SPOT: **70% = 3500 USDT**
-- FUTURES margin: **30% = 1500 USDT**
-- Pozicion SHORT total: **3000 USDT**
+- Investim: 5000 USDT  
+- SPOT: 3500  
+- FUTURES: 1500 → lev 2x = 3000 short
 
 ---
 
-### 3️⃣ Çfarë ndodh në TP (p.sh −2%)?
-- SPOT humbet pak
-- FUTURES fiton pothuajse sa humbet spot
-- Fitimi i futures kthehet në SPOT
-- Kur çmimi ngjitet përsëri → del me më shumë coin
+### 3️⃣ Çfarë ndodh në TP?
+- SPOT humbet pak  
+- FUTURES fiton  
+- Fitimi i futures hidhet te SPOT  
+- Kur ngjitet në 0% → ke **më shumë coin**
 
 ---
 
-### 4️⃣ Çfarë ndodh në SL (p.sh +6%)?
-- SPOT fiton
-- FUTURES humb
-- P&L neto shpesh del **pak fitim** me lev 2x
+### 4️⃣ Çfarë ndodh në SL?
+- SPOT fiton  
+- FUTURES humb  
+- Me lev 2x zakonisht del **afër zeros** ose **pak fitim**
 
 ---
 
-### 5️⃣ Formulat e çmimeve
-
-- **TP** = entry × (1 − TP%)
-- **SL** = entry × (1 + SL%)
-
----
-
-### 6️⃣ Avantazhi (EDGE)
-- Lev 2x nuk djeg kapitalin si lev të lartë
-- TP është më i lehtë për t’u goditur
-- SL shpesh del neutrale / fitim i vogël
-- Shton coin në çdo cikël të rënies
+### 5️⃣ Formulat
+- **TP = entry × (1 − TP%)**  
+- **SL = entry × (1 + SL%)**
 
 ---
 
-### 7️⃣ Udhëzimet
+### 6️⃣ Avantazhi
+- Lev 2x është i butë  
+- Jo rrezik likuidimi  
+- Shton coin në ciklet e rënies  
+- SL është shpesh i lehtë
 
-1. Vendos investimin
-2. Zgjidh SPOT/FUTURES %
-3. Vendos Leverage
-4. Shkruaj çmimin entry
-5. Kopjo TP & SL
-6. Kontrollo tabelat e TP/SL
+---
+
+### 7️⃣ Udhëzime pune
+1. Vendos investimin  
+2. Zgjidh SPOT / FUTURES  
+3. Vendos lev  
+4. Vendos entry  
+5. Kopjo TP & SL  
+6. Kontrollo tabelat
 
 ---
 
 ### 8️⃣ Këshilla
-
-- Mos e përdor 24/7
-- Përdor vetëm kur ka luhatje
-- Mos e përdor në super-bull afatgjatë
-- Testoje me shuma të vogla para kapitaleve të mëdha
+- Mos e përdor në super-bull  
+- Ideal për treg me valë  
+- Testo me sasi të vogla  
 """)
