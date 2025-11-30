@@ -103,7 +103,7 @@ with colB:
         "🎯 TP për SHORT (rënia, −%)",
         min_value=0.1,
         max_value=80.0,
-        value=2.0,      # ti the minus 2%
+        value=2.0,      # minus 2% sipas kërkesës
         step=0.1
     )
 
@@ -188,7 +188,8 @@ if investimi_total > 0:
 
     with c2:
         st.markdown('<div class="elb-card">', unsafe_allow_html=True)
-        st.markmarkdown('<div class="metric-label">FUTURES margin (30%)</div>', unsafe_allow_html=True)
+        # 🔧 KËTU ISHTE GABIMI (markmarkdown → markdown)
+        st.markdown('<div class="metric-label">FUTURES margin (30%)</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="metric-value">{fut_margin:,.2f} USDT</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
