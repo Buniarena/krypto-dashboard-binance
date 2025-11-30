@@ -80,7 +80,7 @@ if uploaded_logo is not None:
 else:
     st.markdown("### 💹 ElBuni Strategy PRO")
 
-# Fshirë teksti – clean header
+# Header clean, pa tekst
 st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
 # ======================== TABS ========================
@@ -264,8 +264,9 @@ SL = entry × (1 + SL%)
 - Hedging të sigurt  
 """)
 
-    # ===================== SQARIMI FINAL PRO ========================
-    st.markdown("""
+# ===================== SQARIMI FINAL POSHTË FAQES ========================
+st.markdown("<hr>", unsafe_allow_html=True)
+st.markdown("""
 # 🧩 **SQARIMI FINAL – SI FITON STRATEGJIA ELBUNI**
 
 ### 🔥 Fiton edhe kur bie – edhe kur ngrihet
@@ -282,7 +283,7 @@ SL = entry × (1 + SL%)
 ### 🎯 Rezultati afatgjatë:
 🔵 *TP të vogla* → FITIM dhe shtim coini  
 🔵 *SL të rralla* → HUMBJE të vogla ose zero  
-🔵 *Cikli total* → Kapital që rritet me risk minimal
+🔵 *Cikli total* → Kapital që rritet me risk minimal  
 
 Kjo është **strategjia më e balancuar**, më profesionale dhe më e sigurt për hedging në kripto.  
 """)
