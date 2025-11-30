@@ -3,7 +3,7 @@ import pandas as pd
 
 # ======================== KONFIGURIMI BAZË ========================
 st.set_page_config(
-    page_title="ElBuni Strategy PRO – 70/30 · 3x · -2%",
+    page_title="ElBuni Strategy PRO – 70/30 · 3x · TP & SL",
     page_icon="💹",
     layout="wide"
 )
@@ -67,11 +67,11 @@ h2, h3 {
 st.markdown(
     """
     <div class="elb-card">
-        <div class="elb-title">💹 ElBuni Strategy PRO – Calculator</div>
+        <div class="elb-title">💹 ElBuni Strategy PRO – TP & SL</div>
         <div class="elb-subtitle">
-            Model fiks: <b>70% SPOT</b> · <b>30% FUTURES SHORT</b> · <b>Leverage 3x</b> ·
-            short mbyllet në <b>−2%</b>, fitimi i futures hidhet në SPOT, pastaj çmimi kthehet në <b>0%</b>.
-            <br>Ti shkruan vetëm <b>investimin</b> dhe (opsionale) <b>çmimin e coinit</b>.
+            Model fiks: <b>70% SPOT</b> · <b>30% FUTURES SHORT</b> · <b>Leverage 3x</b>.<br>
+            FUTURES ka <b>Take Profit</b> në rënie (−TP%) dhe <b>Stop Loss</b> në ngritje (+SL%).<br>
+            Fitimi i futures në TP hidhet në SPOT, pastaj çmimi kthehet në <b>0%</b> → llogaritet fitimi final.
         </div>
     </div>
     """,
@@ -81,15 +81,14 @@ st.markdown(
 st.markdown("")
 
 # ======================== PARAMETRAT E FIKSUAR ========================
-SPOT_PCT = 70          # %
-FUTURES_PCT = 30       # %
+SPOT_PCT = 70.0        # %
+FUTURES_PCT = 30.0     # %
 LEVERAGE = 3.0         # x
-DROP_PERCENT = 2.0     # %
 
 # ======================== INPUTET ========================
-st.markdown("### 📥 Shkruaj investimin dhe (nëse do) çmimin e coinit")
+st.markdown("### 📥 Shkruaj investimin, TP dhe SL")
 
-colA, colB = st.columns(2)
+colA, colB, colC = st.columns(3)
 
 with colA:
     investimi_total = st.number_input(
@@ -100,6 +99,27 @@ with colA:
     )
 
 with colB:
+    tp_down_percent = st.number_input(
+        "🎯 TP për SHORT (rënia, −%)",
+        min_value=0.1,
+        max_value=80.0,
+        value=2.0,      # ti the minus 2%
+        step=0.1
+    )
+
+with colC:
+    sl_up_percent = st.number_input(
+        "🛑 SL për SHORT (ngritja, +%)",
+        min_value=0.1,
+        max_value=80.0,
+        value=5.0,
+        step=0.1
+    )
+
+st.markdown("")
+
+col_price1, col_price2 = st.columns(2)
+with col_price1:
     price_entry = st.number_input(
         "💲 Çmimi hyrës i coinit (opsionale – për coin-at)",
         min_value=0.0,
@@ -111,40 +131,52 @@ st.markdown("---")
 
 # ======================== LLOGARITJET ========================
 if investimi_total > 0:
-    d = DROP_PERCENT / 100.0
-
     # Kapitali në spot & futures
     spot_cap = investimi_total * SPOT_PCT / 100.0
     fut_margin = investimi_total * FUTURES_PCT / 100.0
     fut_notional = fut_margin * LEVERAGE
 
-    # Në -2% rënie
-    spot_loss_drop = spot_cap * d
-    fut_profit_drop = fut_notional * d
+    # ---------- SKENARI TP (RËNIE −tp%) ----------
+    d_tp = tp_down_percent / 100.0
 
-    spot_value_after_drop = spot_cap * (1 - d)
-    spot_value_after_profit = spot_value_after_drop + fut_profit_drop
+    spot_loss_tp = spot_cap * d_tp          # humbja në SPOT në -TP%
+    fut_profit_tp = fut_notional * d_tp     # fitimi në FUTURES në -TP%
 
-    # Rikthimi nga -2% në 0% → factor = 1/(1-0.02)
-    factor_up = 1.0 / (1.0 - d)
-    spot_final = spot_value_after_profit * factor_up
+    spot_value_after_drop = spot_cap * (1 - d_tp)
+    spot_value_after_profit = spot_value_after_drop + fut_profit_tp
 
-    total_final = spot_final + fut_margin
-    total_pnl_final = total_final - investimi_total
+    # Rikthimi nga -TP% në 0% → factor = 1/(1 - d_tp)
+    factor_up_tp = 1.0 / (1.0 - d_tp)
+    spot_final_tp = spot_value_after_profit * factor_up_tp
 
-    total_at_drop = spot_value_after_drop + fut_margin + fut_profit_drop
-    total_pnl_drop = total_at_drop - investimi_total
+    total_final_tp = spot_final_tp + fut_margin
+    total_pnl_final_tp = total_final_tp - investimi_total
 
-    # Coin llogaritjet (nëse ka cmim hyrës)
-    coins_initial = coins_from_profit = coins_total = None
+    total_at_tp = spot_value_after_drop + fut_margin + fut_profit_tp
+    total_pnl_at_tp = total_at_tp - investimi_total
+
+    # coin calculations për TP
+    coins_initial_tp = coins_from_profit_tp = coins_total_tp = None
     if price_entry > 0:
-        price_drop = price_entry * (1 - d)
-        coins_initial = spot_cap / price_entry
-        coins_from_profit = fut_profit_drop / price_drop
-        coins_total = coins_initial + coins_from_profit
+        price_tp = price_entry * (1 - d_tp)
+        coins_initial_tp = spot_cap / price_entry
+        coins_from_profit_tp = fut_profit_tp / price_tp
+        coins_total_tp = coins_initial_tp + coins_from_profit_tp
 
-    # ======================== INSIGHT KARTAT ========================
-    st.markdown("### 📊 Insight i shpejtë")
+    # ---------- SKENARI SL (NGRITJE +sl%) ----------
+    u_sl = sl_up_percent / 100.0
+
+    spot_profit_sl = spot_cap * u_sl        # fitimi në SPOT kur rritet
+    fut_loss_sl = fut_notional * u_sl       # humbja në FUTURES short
+
+    spot_value_sl = spot_cap * (1 + u_sl)
+
+    # P&L total në momentin e SL-së
+    pnl_sl = spot_profit_sl - fut_loss_sl
+    total_sl = investimi_total + pnl_sl
+
+    # ======================== KARTAT E TP & SL ========================
+    st.markdown("### 📊 Insight i shpejtë: TP & SL")
 
     c1, c2, c3, c4 = st.columns(4)
 
@@ -156,78 +188,97 @@ if investimi_total > 0:
 
     with c2:
         st.markdown('<div class="elb-card">', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">FUTURES margin (30%)</div>', unsafe_allow_html=True)
+        st.markmarkdown('<div class="metric-label">FUTURES margin (30%)</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="metric-value">{fut_margin:,.2f} USDT</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c3:
         st.markdown('<div class="elb-card">', unsafe_allow_html=True)
-        st.markdown(f'<div class="metric-label">Fitimi FUTURES në -{DROP_PERCENT:.1f}%</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="metric-value">+{fut_profit_drop:,.2f} USDT</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-label">TP: Fitimi FUTURES në -{tp_down_percent:.1f}%</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-value">+{fut_profit_tp:,.2f} USDT</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c4:
         st.markdown('<div class="elb-card">', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">Fitimi total final në 0%</div>', unsafe_allow_html=True)
-        color_pnl = "#22c55e" if total_pnl_final >= 0 else "#ef4444"
-        sign = "+" if total_pnl_final >= 0 else ""
+        st.markdown(f'<div class="metric-label">SL: P&L në +{sl_up_percent:.1f}%</div>', unsafe_allow_html=True)
+        color_sl = "#22c55e" if pnl_sl >= 0 else "#ef4444"
+        sign_sl = "+" if pnl_sl >= 0 else ""
         st.markdown(
-            f'<div class="metric-value" style="color:{color_pnl};">{sign}{total_pnl_final:,.2f} USDT</div>',
+            f'<div class="metric-value" style="color:{color_sl};">{sign_sl}{pnl_sl:,.2f} USDT</div>',
             unsafe_allow_html=True
         )
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("")
 
-    # ======================== TABELA ========================
-    st.markdown("### 🧮 Detajet e plota të skenarit ElBuni (70/30 · 3x · -2%)")
+    # ======================== TABELA E SKENARIT TP ========================
+    st.markdown("### 🧮 Skenari TP – Çmimi bie −TP%, mbyllet short-i, fitimi hidhet në SPOT dhe çmimi kthehet në 0%")
 
-    calc_rows = [{
+    tp_rows = [{
         "Investimi total (USDT)": round(investimi_total, 2),
         "SPOT fillestar (USDT)": round(spot_cap, 2),
         "FUTURES margin (USDT)": round(fut_margin, 2),
         "Leverage FUTURES (x)": LEVERAGE,
-        "Rënia ku mbyllet short (%)": DROP_PERCENT,
-        "Fitimi FUTURES në -2% (USDT)": round(fut_profit_drop, 2),
-        "Humbja SPOT në -2% (USDT)": round(spot_loss_drop, 2),
-        "P&L total në -2% (USDT)": round(total_pnl_drop, 2),
-        "Fitimi total kur kthehet 0% (USDT)": round(total_pnl_final, 2),
-        "Totali final në 0% (USDT)": round(total_final, 2),
+        "TP (rënia, −%)": tp_down_percent,
+        "Fitimi FUTURES në −TP% (USDT)": round(fut_profit_tp, 2),
+        "Humbja SPOT në −TP% (USDT)": round(spot_loss_tp, 2),
+        "P&L total në −TP% (USDT)": round(total_pnl_at_tp, 2),
+        "Fitimi total kur kthehet 0% (USDT)": round(total_pnl_final_tp, 2),
+        "Totali final në 0% (USDT)": round(total_final_tp, 2),
     }]
 
-    if coins_total is not None:
-        calc_rows[0]["Sasia fillestare (coin)"] = round(coins_initial, 2)
-        calc_rows[0]["Coin nga fitimi i futures"] = round(coins_from_profit, 2)
-        calc_rows[0]["Sasia totale në 0% (coin)"] = round(coins_total, 2)
+    if coins_total_tp is not None:
+        tp_rows[0]["Sasia fillestare (coin)"] = round(coins_initial_tp, 2)
+        tp_rows[0]["Coin nga fitimi i futures"] = round(coins_from_profit_tp, 2)
+        tp_rows[0]["Sasia totale në 0% (coin)"] = round(coins_total_tp, 2)
 
-    calc_df = pd.DataFrame(calc_rows)
-    st.dataframe(calc_df, use_container_width=True)
+    tp_df = pd.DataFrame(tp_rows)
+    st.dataframe(tp_df, use_container_width=True)
+
+    # ======================== TABELA E SKENARIT SL ========================
+    st.markdown("### 🧨 Skenari SL – Çmimi rritet +SL%, mbyllet short-i me humbje")
+
+    sl_rows = [{
+        "Investimi total (USDT)": round(investimi_total, 2),
+        "SPOT fillestar (USDT)": round(spot_cap, 2),
+        "FUTURES margin (USDT)": round(fut_margin, 2),
+        "Leverage FUTURES (x)": LEVERAGE,
+        "SL (ngritja, +%)": sl_up_percent,
+        "Fitimi SPOT në +SL% (USDT)": round(spot_profit_sl, 2),
+        "Humbja FUTURES në +SL% (USDT)": round(fut_loss_sl, 2),
+        "P&L total në +SL% (USDT)": round(pnl_sl, 2),
+        "Totali i kapitalit në +SL% (USDT)": round(total_sl, 2),
+    }]
+
+    sl_df = pd.DataFrame(sl_rows)
+    st.dataframe(sl_df, use_container_width=True)
 
     # ======================== PËRMBLEDHJE ========================
-    st.markdown("### 📝 Përmbledhje e skenarit")
+    st.markdown("### 📝 Përmbledhje e skenarëve")
 
-    sign_drop = "+" if total_pnl_drop >= 0 else ""
-    sign_final = "+" if total_pnl_final >= 0 else ""
+    sign_tp_drop = "+" if total_pnl_at_tp >= 0 else ""
+    sign_tp_final = "+" if total_pnl_final_tp >= 0 else ""
+    sign_sl_txt = "+" if pnl_sl >= 0 else ""
 
     st.markdown(f"""
-- **Modeli ElBuni fiks:** 70% SPOT · 30% FUTURES · Leverage 3× · short mbyllet në **−2%**.
-- Në rënien **−2%**:
-  - SPOT humb: **{spot_loss_drop:,.2f} USDT**
-  - FUTURES fiton: **{fut_profit_drop:,.2f} USDT**
-  - P&L total në atë moment: **{sign_drop}{total_pnl_drop:,.2f} USDT**
+**🎯 TP – Rënia −{tp_down_percent:.1f}%**
 
-- Fitimi i futures hidhet në SPOT.
-- Kur çmimi kthehet në **0%**:
-  - Fitimi total final: **{sign_final}{total_pnl_final:,.2f} USDT**
-  - Kapitali total bëhet: **{total_final:,.2f} USDT** (nga {investimi_total:,.2f} USDT)
-""")
+- SPOT humb: **{spot_loss_tp:,.2f} USDT**
+- FUTURES fiton: **{fut_profit_tp:,.2f} USDT**
+- P&L total në momentin e mbylljes së short-it (−TP%): **{sign_tp_drop}{total_pnl_at_tp:,.2f} USDT**
 
-    if coins_total is not None:
-        st.markdown(f"""
-**Niveli i coinit (me çmimin hyrës {price_entry:.12f}):**
-- Coin-a fillestarë: **{coins_initial:,.2f}**
-- Coin-a nga fitimi i futures: **{coins_from_profit:,.2f}**
-- Totali i coin-it kur çmimi kthehet në 0%: **{coins_total:,.2f}**
+Fitimi i futures hidhet në SPOT. Kur çmimi kthehet prapë në **0%**:
+- Fitimi total final i strategjisë: **{sign_tp_final}{total_pnl_final_tp:,.2f} USDT**
+- Kapitali total bëhet: **{total_final_tp:,.2f} USDT** (nga {investimi_total:,.2f} USDT)
+
+---
+
+**🛑 SL – Ngritja +{sl_up_percent:.1f}%**
+
+- SPOT fiton: **{spot_profit_sl:,.2f} USDT**
+- FUTURES humb: **{fut_loss_sl:,.2f} USDT**
+- P&L total në momentin e mbylljes së short-it (SL): **{sign_sl_txt}{pnl_sl:,.2f} USDT**
+- Kapitali total në +SL%: **{total_sl:,.2f} USDT**
 """)
 
 else:
