@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from PIL import Image
+import os  # ➕ për ruajtjen e logos në disk
 
 # ======================== KONFIGURIMI BAZË ========================
 st.set_page_config(
@@ -67,20 +68,37 @@ with st.sidebar:
         type=["png", "jpg", "jpeg"]
     )
 
+# ======================== LOGO PERSISTENTE NË DISK ========================
+LOGO_PATH = "uploads/el_buni_logo.png"
+
+# krijo folderin uploads nëse nuk ekziston
+os.makedirs("uploads", exist_ok=True)
+
+# nëse përdoruesi ngarkon logo të re → ruaje në disk
+if uploaded_logo is not None:
+    try:
+        with open(LOGO_PATH, "wb") as f:
+            f.write(uploaded_logo.getbuffer())
+    except Exception as e:
+        st.sidebar.write("❌ Nuk u ruajt logoja:", e)
+
+# provo të lexosh logon nga disk
+logo_to_show = None
+if os.path.exists(LOGO_PATH):
+    try:
+        logo_to_show = Image.open(LOGO_PATH)
+    except:
+        logo_to_show = None
+
 # ======================== HEADER ME LOGO ========================
 st.markdown("")
 
-if uploaded_logo is not None:
-    try:
-        logo = Image.open(uploaded_logo)
-        st.image(logo, use_column_width=False, width=420)
-    except Exception as e:
-        st.markdown("### 💹 ElBuni Strategy PRO")
-        st.write("Logo error:", str(e))
+if logo_to_show is not None:
+    st.image(logo_to_show, use_column_width=False, width=420)
 else:
     st.markdown("### 💹 ElBuni Strategy PRO")
 
-# Header clean, pa tekst
+# Header clean, pa tekst shtesë
 st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
 # ======================== TABS ========================
@@ -250,7 +268,6 @@ with tab_calc:
 - Leverage i futures: **x{leverage}**
 """)
 
-        # Skenari TP i detajuar
         st.markdown("#### 🎯 Skenari TP – çmimi bie dhe kthehet në 0%")
 
         st.markdown(f"""
@@ -269,7 +286,6 @@ with tab_calc:
 - Coin total kur çmimi kthehet në 0%: **{coins_total:,.2f}**
 """)
 
-        # Skenari SL i detajuar
         st.markdown("#### 🛑 Skenari SL – çmimi rritet dhe prek stop loss")
 
         st.markdown(f"""
@@ -280,7 +296,6 @@ with tab_calc:
 - Totali i kapitalit në skenarin e SL: **{total_sl:,.2f} USDT**
 """)
 
-        # Mini-konkluzion
         st.markdown("""
 **🧠 Interpretim i shpejtë:**
 - Nëse godet **TP** → merr fitim nga futures, shton coin dhe del me kapital më të madh në rikthim.
