@@ -102,7 +102,9 @@ else:
 st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
 # ======================== TABS ========================
-tab_calc, tab_manual = st.tabs(["🧮 Kalkulatori", "📘 Manuali i Strategjisë"])
+tab_calc, tab_manual, tab_grid = st.tabs(
+    ["🧮 Kalkulatori", "📘 Manuali i Strategjisë", "🧱 ElBuni GRID"]
+)
 
 # ======================== TAB 1: KALKULATORI ========================
 with tab_calc:
@@ -344,6 +346,110 @@ SL = entry × (1 + SL%)
 - Luhatje të shpeshta  
 - Hedging të sigurt  
 """)
+
+# ======================== TAB 3: ELBUNI GRID ========================
+with tab_grid:
+    st.markdown("## 🧱 ElBuni GRID – Mini-Grid vetëm për PEPE/XVG")
+
+    st.markdown("""
+Strategji shumë e sigurt për luhatje të vogla.
+
+- Vendos disa **BUY** në rënie
+- Vendos **TP** të vegjël për çdo nivel
+- Çdo cikël (BUY → TP) sjell fitim + coin, pa stres për drejtimin afatgjatë.
+
+Më poshtë llogaritet një grid i thjeshtë, i ndarë në nivele të barabarta.
+""")
+
+    st.markdown("---")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        total_cap_grid = st.number_input(
+            "💰 Kapitali për GRID (USDT)",
+            min_value=10.0,
+            value=200.0,
+            step=10.0
+        )
+
+        step_percent = st.number_input(
+            "📉 Distanca mes BUY-ve (−% nga njëri-tjetri)",
+            min_value=0.1,
+            max_value=50.0,
+            value=1.0,
+            step=0.1
+        )
+
+    with col2:
+        grid_levels = st.number_input(
+            "📊 Numri i niveleve (grideve)",
+            min_value=1,
+            max_value=20,
+            value=5
+        )
+
+        tp_percent = st.number_input(
+            "📈 TP për çdo nivel (+%)",
+            min_value=0.1,
+            max_value=50.0,
+            value=1.0,
+            step=0.1
+        )
+
+    entry_grid = st.number_input(
+        "💲 Çmimi hyrës (entry) – PEPE/XVG",
+        min_value=0.0,
+        value=0.00000457,
+        format="%.12f"
+    )
+
+    st.markdown("---")
+
+    if entry_grid > 0:
+        amount_per_grid = total_cap_grid / grid_levels
+
+        buy_prices = []
+        tp_prices = []
+        coins = []
+        profits = []
+
+        for i in range(grid_levels):
+            # çdo nivel është më poshtë se i mëparshmi me step_percent
+            buy_price = entry_grid * (1 - (step_percent/100) * i)
+            tp_price = buy_price * (1 + tp_percent/100)
+
+            buy_prices.append(buy_price)
+            tp_prices.append(tp_price)
+
+            coin_amount = amount_per_grid / buy_price
+            coins.append(coin_amount)
+
+            profit_usdt = coin_amount * (tp_price - buy_price)
+            profits.append(profit_usdt)
+
+        df_grid = pd.DataFrame({
+            "Niveli": list(range(1, grid_levels + 1)),
+            "BUY Price": buy_prices,
+            "TP Price": tp_prices,
+            "Coins": coins,
+            "Profit/Level (USDT)": profits
+        })
+
+        st.markdown("### 📊 Tabela e GRID-it")
+        st.dataframe(df_grid, use_container_width=True)
+
+        total_profit = sum(profits)
+        total_coins = sum(coins)
+
+        st.markdown("### 📈 Totali i GRID-it")
+        colg1, colg2 = st.columns(2)
+        with colg1:
+            st.metric("Fitimi total (USDT) nëse plotësohen të gjitha TP-të", f"{total_profit:,.4f}")
+        with colg2:
+            st.metric("Coin total që blihen në të gjithë GRID-in", f"{total_coins:,.4f}")
+    else:
+        st.info("🪙 Shkruaj një çmim hyrës > 0 për të llogaritur grid-in.")
 
 # ===================== SQARIMI FINAL – KARTË PREMIUM POSHTË FAQES ========================
 st.markdown("<hr>", unsafe_allow_html=True)
