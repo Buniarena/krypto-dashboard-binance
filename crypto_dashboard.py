@@ -59,15 +59,26 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ======================== SIDEBAR – UPLOAD LOGO ========================
+with st.sidebar:
+    st.markdown("### 🔰 Logo ElBuni")
+    uploaded_logo = st.file_uploader(
+        "Ngarko logon ElBuni (PNG / JPG)",
+        type=["png", "jpg", "jpeg"]
+    )
+
 # ======================== HEADER ME LOGO ========================
 st.markdown("")
 
-try:
-    logo = Image.open("file_000000008fcc71f9bc62598609e1a538.png")
-    st.image(logo, use_column_width=False, width=420)
-except Exception as e:
+if uploaded_logo is not None:
+    try:
+        logo = Image.open(uploaded_logo)
+        st.image(logo, use_column_width=False, width=420)
+    except Exception as e:
+        st.markdown("### 💹 ElBuni Strategy PRO")
+        st.write("Logo error:", str(e))
+else:
     st.markdown("### 💹 ElBuni Strategy PRO")
-    st.write("Logo error:", str(e))
 
 st.markdown("""
 <div class="elb-card">
@@ -226,7 +237,7 @@ with tab_calc:
 
         st.dataframe(sl_df, use_container_width=True)
 
-# ======================== MANUALI ========================
+# ======================== TAB 2: MANUALI ========================
 with tab_manual:
     st.markdown("## 📘 Manuali i Strategjisë ElBuni (shembull me lev 2x)")
 
@@ -277,13 +288,14 @@ Qëllimi:
 
 ### 6️⃣ Avantazhi (EDGE)
 - Lev 2x nuk djeg kapitalin si lev të lartë
-- TP është shumë i lehtë për t’u goditur
+- TP është më i lehtë për t’u goditur
 - SL shpesh del neutrale / fitim i vogël
 - Shton coin në çdo cikël të rënies
 
 ---
 
 ### 7️⃣ Udhëzimet
+
 1. Vendos investimin
 2. Zgjidh SPOT/FUTURES %
 3. Vendos Leverage
@@ -294,9 +306,9 @@ Qëllimi:
 ---
 
 ### 8️⃣ Këshilla
+
 - Mos e përdor 24/7
 - Përdor vetëm kur ka luhatje
 - Mos e përdor në super-bull afatgjatë
-- Testoje me vëllime të vogla para kapitaleve të mëdha
-
+- Testoje me shuma të vogla para kapitaleve të mëdha
 """)
