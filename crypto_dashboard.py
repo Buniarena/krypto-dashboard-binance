@@ -175,7 +175,7 @@ with tab_calc:
         d_tp = tp_down_percent / 100
         u_sl = sl_up_percent / 100
 
-        # TP
+        # ---------- TP ----------
         spot_loss_tp = spot_cap * d_tp
         fut_profit_tp = fut_notional * d_tp
 
@@ -185,7 +185,16 @@ with tab_calc:
         total_final_tp = spot_final_tp + fut_margin
         pnl_total_tp = total_final_tp - investimi_total
 
-        # SL
+        # coin-at nëse kemi çmim entry > 0
+        coins_initial = coins_from_fut = coins_total = None
+        if price_entry > 0:
+            price_after_drop = price_entry * (1 - d_tp)
+            if price_after_drop > 0:
+                coins_initial = spot_cap / price_entry
+                coins_from_fut = fut_profit_tp / price_after_drop
+                coins_total = coins_initial + coins_from_fut
+
+        # ---------- SL ----------
         spot_profit_sl = spot_cap * u_sl
         fut_loss_sl = fut_notional * u_sl
 
@@ -194,7 +203,7 @@ with tab_calc:
 
         # ======================== TABELAT ========================
         st.markdown("### 📘 TP – rikthimi në 0%")
-        tp_df = pd.DataFrame([{
+        tp_row = {
             "Investimi total": investimi_total,
             "SPOT %": spot_pct,
             "FUTURES %": futures_pct,
@@ -204,7 +213,13 @@ with tab_calc:
             "Humbja SPOT": spot_loss_tp,
             "Totali final": total_final_tp,
             "P&L final": pnl_total_tp
-        }])
+        }
+        if coins_total is not None:
+            tp_row["Coin fillestarë"] = coins_initial
+            tp_row["Coin nga FUTURES"] = coins_from_fut
+            tp_row["Coin total në 0%"] = coins_total
+
+        tp_df = pd.DataFrame([tp_row])
         st.dataframe(tp_df, use_container_width=True)
 
         st.markdown("### 📕 SL – ngritja +%")
@@ -220,6 +235,57 @@ with tab_calc:
             "P&L final": pnl_sl
         }])
         st.dataframe(sl_df, use_container_width=True)
+
+        # ======================== PËRMBLEDHJE DETAJ – SA KAM FITUAR ========================
+        sign_tp = "+" if pnl_total_tp >= 0 else ""
+        sign_sl = "+" if pnl_sl >= 0 else ""
+
+        st.markdown("### 🧾 Përmbledhja e konfigurimit tënd")
+
+        st.markdown(f"""
+**💰 Çfarë ke futur:**
+- Investimi total: **{investimi_total:,.2f} USDT**
+- SPOT ({spot_pct}%): **{spot_cap:,.2f} USDT**
+- FUTURES margin ({futures_pct}%): **{fut_margin:,.2f} USDT**
+- Leverage i futures: **x{leverage}**
+""")
+
+        # Skenari TP i detajuar
+        st.markdown("#### 🎯 Skenari TP – çmimi bie dhe kthehet në 0%")
+
+        st.markdown(f"""
+- Rënia e çmimit: **-{tp_down_percent:.2f}%**
+- Humbja në SPOT në −TP%: **{spot_loss_tp:,.2f} USDT**
+- Fitimi në FUTURES në −TP%: **{fut_profit_tp:,.2f} USDT**
+- Totali i kapitalit pas rikthimit në 0%: **{total_final_tp:,.2f} USDT**
+- P&L total i strategjisë në këtë cikël: **{sign_tp}{pnl_total_tp:,.2f} USDT**
+""")
+
+        if coins_total is not None:
+            st.markdown(f"""
+**📈 Coin-at (nëse ke futur çmimin entry):**
+- Coin fillestarë nga SPOT: **{coins_initial:,.2f}**
+- Coin të blerë nga fitimi i futures në rënie: **{coins_from_fut:,.2f}**
+- Coin total kur çmimi kthehet në 0%: **{coins_total:,.2f}**
+""")
+
+        # Skenari SL i detajuar
+        st.markdown("#### 🛑 Skenari SL – çmimi rritet dhe prek stop loss")
+
+        st.markdown(f"""
+- Ngritja e çmimit: **+{sl_up_percent:.2f}%**
+- Fitimi në SPOT në +SL%: **{spot_profit_sl:,.2f} USDT**
+- Humbja në FUTURES në +SL%: **{fut_loss_sl:,.2f} USDT**
+- P&L total në momentin e SL: **{sign_sl}{pnl_sl:,.2f} USDT**
+- Totali i kapitalit në skenarin e SL: **{total_sl:,.2f} USDT**
+""")
+
+        # Mini-konkluzion
+        st.markdown("""
+**🧠 Interpretim i shpejtë:**
+- Nëse godet **TP** → merr fitim nga futures, shton coin dhe del me kapital më të madh në rikthim.
+- Nëse godet **SL** → SPOT të mbron, futures humb, por totali i kapitalit zakonisht del afër zeros ose pak në fitim/humbje, në varësi të konfigurimit.
+""")
 
 # ======================== TAB 2: MANUALI ========================
 with tab_manual:
