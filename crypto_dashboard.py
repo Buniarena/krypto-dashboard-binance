@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from PIL import Image
 
 # ======================== KONFIGURIMI BAZË ========================
 st.set_page_config(
@@ -58,7 +59,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ======================== HEADER ========================
+# ======================== HEADER ME LOGO ========================
+st.markdown("")  # pak hapësirë sipër
+
+try:
+    logo = Image.open("elbuni_logo.png")  # ndrysho emrin nëse file quhet ndryshe
+    st.image(logo, use_column_width=False, width=420)
+except Exception:
+    st.markdown("### 💹 ElBuni Strategy PRO")
+
 st.markdown("""
 <div class="elb-card">
     <div class="elb-title">💹 ElBuni Strategy PRO</div>
@@ -96,7 +105,7 @@ with tab_calc:
             "⚙️ Leverage Futures (x)",
             min_value=1.0,
             max_value=10.0,
-            value=2.0,   # mund ta ndryshosh si të duash, manuali është shembull me 2x
+            value=2.0,   # default 2x, manuali shembull me 2x
             step=0.5
         )
 
@@ -219,7 +228,7 @@ with tab_calc:
         total_sl = investimi_total + pnl_sl
 
         # ======================== INSIGHT ========================
-        st.markdown("### 📊 Insight i shpejtë i skenarit")
+        st.markdown("### 📊 Insight i skenarit")
 
         c1, c2, c3 = st.columns(3)
 
