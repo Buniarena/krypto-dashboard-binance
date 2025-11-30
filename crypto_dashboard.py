@@ -275,6 +275,115 @@ if qty_current_coin > 0:
 else:
     st.write(f"Nuk ke {coin_label} në portofol aktualisht.")
 
+# ======================== ALBUNI STRATEGY KALKULATOR ========================
+st.markdown("---")
+st.header("🧮 Albuni Strategy – Kalkulatori i Hedging (Futures + Spot)")
+
+colA, colB = st.columns(2)
+
+with colA:
+    investimi_total = st.number_input(
+        "💰 Investimi total (USDT)",
+        min_value=0.0,
+        value=20000.0,
+        step=100.0
+    )
+    spot_pct = st.slider("📊 Përqindja në SPOT (%)", 0, 100, 70)
+    leverage = st.number_input(
+        "⚙️ Leverage për FUTURES (x)",
+        min_value=1.0,
+        value=2.0,
+        step=0.5
+    )
+
+with colB:
+    futures_pct = 100 - spot_pct
+    st.write(f"📉 Përqindja në FUTURES: **{futures_pct}%**")
+    drop_percent = st.number_input(
+        "📉 Rënia ku mbyll SHORT-in (–%)",
+        min_value=0.1,
+        max_value=80.0,
+        value=4.0,
+        step=0.1
+    )
+    price_entry = st.number_input(
+        "💲 Çmimi hyrës i coinit (opsionale)",
+        min_value=0.0,
+        value=0.00000457,
+        format="%.12f"
+    )
+
+# Llogaritjet vetëm nëse ka investim
+if investimi_total > 0:
+    d = drop_percent / 100.0
+
+    # Kapitali në spot & futures
+    spot_cap = investimi_total * spot_pct / 100.0
+    fut_margin = investimi_total * futures_pct / 100.0
+    fut_notional = fut_margin * leverage
+
+    # Në -X% rënie
+    spot_loss_drop = spot_cap * d                    # humbja në SPOT
+    fut_profit_drop = fut_notional * d               # fitimi në FUTURES
+
+    spot_value_after_drop = spot_cap * (1 - d)       # vlera e spot pas rënies
+    # Fitimi i futures hidhet në spot në çmimin e rënies
+    spot_value_after_profit = spot_value_after_drop + fut_profit_drop
+
+    # Rikthimi nga -X% në 0% → rritje faktori = 1/(1-d)
+    factor_up = 1.0 / (1.0 - d)
+    spot_final = spot_value_after_profit * factor_up
+
+    # Futures margin mbetet siç ishte (profitin e kemi kaluar në spot)
+    total_final = spot_final + fut_margin
+    total_pnl_final = total_final - investimi_total
+
+    # Totali në momentin e -X% (kur mbyll short-in)
+    total_at_drop = spot_value_after_drop + fut_margin + fut_profit_drop
+    total_pnl_drop = total_at_drop - investimi_total
+
+    # Nëse kemi çmim hyrës, llogarisim edhe sasinë e coinit
+    coins_initial = coins_from_profit = coins_total = None
+    if price_entry > 0:
+        price_drop = price_entry * (1 - d)
+        coins_initial = spot_cap / price_entry
+        coins_from_profit = fut_profit_drop / price_drop
+        coins_total = coins_initial + coins_from_profit
+
+    # Ndërtojmë tabelën e rezultateve
+    calc_rows = [{
+        "Investimi total (USDT)": round(investimi_total, 2),
+        "SPOT fillestar (USDT)": round(spot_cap, 2),
+        "FUTURES margin (USDT)": round(fut_margin, 2),
+        "Leverage FUTURES": leverage,
+        "Rënia ku mbyllet short (%)": drop_percent,
+        "Fitimi FUTURES në -X% (USDT)": round(fut_profit_drop, 2),
+        "Humbja SPOT në -X% (USDT)": round(spot_loss_drop, 2),
+        "P&L total në -X% (USDT)": round(total_pnl_drop, 2),
+        "Fitimi total kur kthehet 0% (USDT)": round(total_pnl_final, 2),
+        "Totali final në 0% (USDT)": round(total_final, 2),
+    }]
+
+    if coins_total is not None:
+        calc_rows[0]["Sasia fillestare (coin)"] = round(coins_initial, 2)
+        calc_rows[0]["Coin nga fitimi i futures"] = round(coins_from_profit, 2)
+        calc_rows[0]["Sasia totale në 0% (coin)"] = round(coins_total, 2)
+
+    calc_df = pd.DataFrame(calc_rows)
+
+    st.subheader("📊 Rezultatet e Albuni Strategy për këtë skenar")
+    st.dataframe(calc_df)
+
+    st.markdown(f"""
+**🧾 Përmbledhje:**
+- Fitimi i futures në -{drop_percent}%: **{fut_profit_drop:.2f} USDT**
+- Humbja e spot në -{drop_percent}%: **{spot_loss_drop:.2f} USDT**
+- P&L total në momentin –{drop_percent}%: **{total_pnl_drop:.2f} USDT**
+- Fitimi total kur çmimi kthehet në 0%: **{total_pnl_final:.2f} USDT**
+""")
+else:
+    st.info("👉 Shkruaj një shumë > 0 në 'Investimi total' për të parë llogaritjet.")
+
 # ======================== TIMER ========================
 ph = st.empty()
 for s in range(REFRESH_INTERVAL, 0, -1):
