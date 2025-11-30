@@ -98,7 +98,7 @@ if logo_to_show is not None:
 else:
     st.markdown("### 💹 ElBuni Strategy PRO")
 
-# Header clean, pa tekst shtesë
+# Header clean
 st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
 # ======================== TABS ========================
@@ -205,7 +205,7 @@ with tab_calc:
         total_final_tp = spot_final_tp + fut_margin
         pnl_total_tp = total_final_tp - investimi_total
 
-        # coin-at nëse kemi çmim entry > 0
+        # --- coin-at nëse kemi çmim entry ---
         coins_initial = coins_from_fut = coins_total = None
         if price_entry > 0:
             price_after_drop = price_entry * (1 - d_tp)
@@ -274,34 +274,28 @@ with tab_calc:
 
         st.markdown(f"""
 - Rënia e çmimit: **-{tp_down_percent:.2f}%**
-- Humbja në SPOT në −TP%: **{spot_loss_tp:,.2f} USDT**
-- Fitimi në FUTURES në −TP%: **{fut_profit_tp:,.2f} USDT**
-- Totali i kapitalit pas rikthimit në 0%: **{total_final_tp:,.2f} USDT**
-- P&L total i strategjisë në këtë cikël: **{sign_tp}{pnl_total_tp:,.2f} USDT**
+- Humbja në SPOT: **{spot_loss_tp:,.2f} USDT**
+- Fitimi në FUTURES: **{fut_profit_tp:,.2f} USDT**
+- Kapitali final në rikthim: **{total_final_tp:,.2f} USDT**
+- P&L total: **{sign_tp}{pnl_total_tp:,.2f} USDT**
 """)
 
         if coins_total is not None:
             st.markdown(f"""
-**📈 Coin-at (nëse ke futur çmimin entry):**
-- Coin fillestarë nga SPOT: **{coins_initial:,.2f}**
-- Coin të blerë nga fitimi i futures në rënie: **{coins_from_fut:,.2f}**
-- Coin total kur çmimi kthehet në 0%: **{coins_total:,.2f}**
+**📈 Coin-at:**
+- Coin fillestarë: **{coins_initial:,.2f}**
+- Coin nga futures: **{coins_from_fut:,.2f}**
+- Coin total: **{coins_total:,.2f}**
 """)
 
-        st.markdown("#### 🛑 Skenari SL – çmimi rritet dhe prek stop loss")
+        st.markdown("#### 🛑 Skenari SL – çmimi rritet")
 
         st.markdown(f"""
 - Ngritja e çmimit: **+{sl_up_percent:.2f}%**
-- Fitimi në SPOT në +SL%: **{spot_profit_sl:,.2f} USDT**
-- Humbja në FUTURES në +SL%: **{fut_loss_sl:,.2f} USDT**
-- P&L total në momentin e SL: **{sign_sl}{pnl_sl:,.2f} USDT**
-- Totali i kapitalit në skenarin e SL: **{total_sl:,.2f} USDT**
-""")
-
-        st.markdown("""
-**🧠 Interpretim i shpejtë:**
-- Nëse godet **TP** → merr fitim nga futures, shton coin dhe del me kapital më të madh në rikthim.
-- Nëse godet **SL** → SPOT të mbron, futures humb, por totali i kapitalit zakonisht del afër zeros ose pak në fitim/humbje, në varësi të konfigurimit.
+- Fitimi SPOT: **{spot_profit_sl:,.2f} USDT**
+- Humbja FUTURES: **{fut_loss_sl:,.2f} USDT**
+- P&L final: **{sign_sl}{pnl_sl:,.2f} USDT**
+- Kapitali final: **{total_sl:,.2f} USDT**
 """)
 
 # ======================== TAB 2: MANUALI ========================
@@ -311,40 +305,32 @@ with tab_manual:
     st.markdown("""
 ### 1️⃣ Çfarë është ElBuni Strategy?
 Një strategji e balancuar SPOT + FUTURES SHORT ku fiton:
-- Kur bie çmimi
-- Kur rritet çmimi
+- Kur bie çmimi  
+- Kur rritet çmimi  
 - Kur kthehet në 0% (fiton coin)
 
 ### 2️⃣ Struktura bazë
-- SPOT: 70%
-- FUTURES: 30%
-- Leverage: 2x
+- SPOT: 70%  
+- FUTURES: 30%  
+- Leverage: 2x  
 
 ### 3️⃣ Çfarë ndodh në TP?
-FUTURES fiton  
-SPOT humbet pak  
-Fitimi i futures hidhet te SPOT  
-Rezultat → më shumë coin kur kthehet çmimi në 0%
+- FUTURES fiton  
+- SPOT humbet pak  
+- Fitimi i futures hidhet te SPOT  
+➡️ Rezultat: Më shumë coin kur rikthehet çmimi në 0%
 
 ### 4️⃣ Çfarë ndodh në SL?
-SPOT fiton shumë  
-FUTURES humb  
-Me lev 2x → zakonisht afër zeros ose fitim i vogël
+- SPOT fiton shumë  
+- FUTURES humb  
+➡️ Me lev 2x zakonisht afër zeros ose fitim i vogël
 
 ### 5️⃣ Avantazhet
-- TP shumë i lehtë për t’u kapur  
-- SL i butë  
-- Shton coin në çdo cikël  
-- Mbrojtje ndaj luhatjeve
+- Rrezik shumë i ulët  
+- TP shumë të shpejta  
+- Shton coin çdo cikël  
+- Perfect për tregje me valë  
 
-### 6️⃣ Formula TP / SL
-TP = entry × (1 − TP%)  
-SL = entry × (1 + SL%)
-
-### 7️⃣ Ideal për:
-- Treg me valë  
-- Luhatje të shpeshta  
-- Hedging të sigurt  
 """)
 
 # ======================== TAB 3: ELBUNI GRID ========================
@@ -354,11 +340,9 @@ with tab_grid:
     st.markdown("""
 Strategji shumë e sigurt për luhatje të vogla.
 
-- Vendos disa **BUY** në rënie
-- Vendos **TP** të vegjël për çdo nivel
-- Çdo cikël (BUY → TP) sjell fitim + coin, pa stres për drejtimin afatgjatë.
-
-Më poshtë llogaritet një grid i thjeshtë, i ndarë në nivele të barabarta.
+- Vendos disa **BUY** në rënie  
+- Vendos **TP** të vegjël për çdo nivel  
+- Çdo cikël sjell fitim të vogël + shtim të coinit  
 """)
 
     st.markdown("---")
@@ -374,7 +358,7 @@ Më poshtë llogaritet një grid i thjeshtë, i ndarë në nivele të barabarta.
         )
 
         step_percent = st.number_input(
-            "📉 Distanca mes BUY-ve (−% nga njëri-tjetri)",
+            "📉 Distanca mes BUY-ve (−%)",
             min_value=0.1,
             max_value=50.0,
             value=1.0,
@@ -383,7 +367,7 @@ Më poshtë llogaritet një grid i thjeshtë, i ndarë në nivele të barabarta.
 
     with col2:
         grid_levels = st.number_input(
-            "📊 Numri i niveleve (grideve)",
+            "📊 Numri i niveleve",
             min_value=1,
             max_value=20,
             value=5
@@ -398,7 +382,7 @@ Më poshtë llogaritet një grid i thjeshtë, i ndarë në nivele të barabarta.
         )
 
     entry_grid = st.number_input(
-        "💲 Çmimi hyrës (entry) – PEPE/XVG",
+        "💲 Çmimi hyrës (PEPE/XVG)",
         min_value=0.0,
         value=0.00000457,
         format="%.12f"
@@ -415,7 +399,7 @@ Më poshtë llogaritet një grid i thjeshtë, i ndarë në nivele të barabarta.
         profits = []
 
         for i in range(grid_levels):
-            # çdo nivel është më poshtë se i mëparshmi me step_percent
+
             buy_price = entry_grid * (1 - (step_percent/100) * i)
             tp_price = buy_price * (1 + tp_percent/100)
 
@@ -445,13 +429,11 @@ Më poshtë llogaritet një grid i thjeshtë, i ndarë në nivele të barabarta.
         st.markdown("### 📈 Totali i GRID-it")
         colg1, colg2 = st.columns(2)
         with colg1:
-            st.metric("Fitimi total (USDT) nëse plotësohen të gjitha TP-të", f"{total_profit:,.4f}")
+            st.metric("Fitimi total (USDT)", f"{total_profit:,.4f}")
         with colg2:
-            st.metric("Coin total që blihen në të gjithë GRID-in", f"{total_coins:,.4f}")
-    else:
-        st.info("🪙 Shkruaj një çmim hyrës > 0 për të llogaritur grid-in.")
+            st.metric("Coin total", f"{total_coins:,.4f}")
 
-# ===================== SQARIMI FINAL – KARTË PREMIUM POSHTË FAQES ========================
+# ===================== SQARIMI FINAL – PREMIUM ========================
 st.markdown("<hr>", unsafe_allow_html=True)
 
 st.markdown("""
@@ -471,17 +453,15 @@ st.markdown("""
     <b>🟩 Pse është e fuqishme?</b><br/>
     ✔ Shton coin në çdo cikël<br/>
     ✔ Fiton kur rikthehet çmimi në 0%<br/>
-    ✔ Leverage 2x është shumë i sigurt krahasuar me 5x / 10x<br/>
-    ✔ Mbrojtje ndaj luhatjeve të forta të tregut<br/>
-    ✔ Rrezik i ulët për likuidim kur menaxhohet siç duhet<br/><br/>
+    ✔ Leverage 2x është shumë i sigurt<br/>
+    ✔ Mbrojtje ndaj luhatjeve<br/><br/>
 
-    <b>🎯 Rezultati afatgjatë:</b><br/>
-    🔵 TP të vogla dhe të shpeshta → fitim i qëndrueshëm + shtim i coinit<br/>
-    🔵 SL të rralla dhe të buta → humbje të vogla, shpesh afër zeros<br/>
-    🔵 Cikli total → kapitali yt rritet me risk të kontrolluar, jo me kumar.<br/><br/>
+    <b>🎯 Afatgjatë:</b><br/>
+    🔵 TP të shpeshta → fitim + shtim coin<br/>
+    🔵 SL të rralla → humbje të vogla<br/>
+    🔵 Kapital që rritet pa rrezik likuidimi<br/><br/>
 
-    Kjo e bën <b>ElBuni Strategy</b> një nga strategjitë më të balancuara, profesionale dhe të sigurta për hedging në kripto,
-    kur përdoret me disiplinë dhe respektim të TP / SL dhe menaxhimit të levës.
+    Kjo e bën <b>ElBuni Strategy</b> strategjinë më të balancuar dhe më profesionale për hedging në kripto.
   </div>
 </div>
 """, unsafe_allow_html=True)
