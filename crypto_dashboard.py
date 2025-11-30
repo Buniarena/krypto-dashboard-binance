@@ -341,7 +341,7 @@ Ti zgjedh:
 
 - **SPOT %** → p.sh. 70%
 - **FUTURES %** → pjesa tjetër (p.sh. 30%)
-- **Leverage** → p.sh. 3x
+- **Leverage** → p.sh. 2x
 
 Shembull:
 
