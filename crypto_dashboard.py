@@ -343,36 +343,270 @@ with tab_calc:
 
 # ======================== TAB 2: MANUALI ========================
 with tab_manual:
-    st.markdown("## 📘 Manuali i Strategjisë ElBuni (lev 2x)")
+    st.markdown("## 📘 Manuali i Strategjisë ElBuni 70/30 (lev 2x)")
 
     st.markdown("""
-### 1️⃣ Çfarë është ElBuni Strategy?
-Një strategji e balancuar SPOT + FUTURES SHORT ku fiton:
-- Kur bie çmimi  
-- Kur rritet çmimi  
-- Kur kthehet në 0% (fiton coin)
+### 1️⃣ Si lindi ideja e strategjisë 70/30
 
-### 2️⃣ Struktura bazë
-- SPOT: 70%  
-- FUTURES: 30%  
-- Leverage: 2x  
+Ideja e ElBuni Strategy 70/30 vjen nga një pyetje e thjeshtë:
 
-### 3️⃣ Çfarë ndodh në TP?
-- FUTURES fiton  
-- SPOT humbet pak  
-- Fitimi i futures hidhet te SPOT  
-➡️ Rezultat: Më shumë coin kur rikthehet çmimi në 0%
+> "A ka mënyrë që, edhe nëse çmimi lëviz lart ose poshtë, unë të mos digjem, por të jem sa më shpesh në fitim dhe të shtoj coin me kalimin e kohës?"
 
-### 4️⃣ Çfarë ndodh në SL?
-- SPOT fiton shumë  
-- FUTURES humb  
-➡️ Me lev 2x zakonisht afër zeros ose fitim i vogël
+Përgjigjja është: po, nëse kombinojmë **SPOT** (pa lev) me **FUTURES SHORT me lev 2x**, në një raport të balancuar **70% SPOT / 30% FUTURES**.
 
-### 5️⃣ Avantazhet
-- Rrezik shumë i ulët  
-- TP të shpejta  
-- Shton coin çdo cikël  
-- Perfect për tregje me valë  
+- 70% të kapitalit mbetet në SPOT (monedha reale, p.sh. PEPE)
+- 30% përdoret si margin në FUTURES SHORT me lev 2x
+- Përcaktohen **TP (Take Profit)** dhe **SL (Stop Loss)** të qartë
+- Fitimet nga futures përdoren për të **shtuar coin në SPOT**
+
+Kështu strategjia nuk është vetëm “me kap fitimin e shpejtë”, por **me rritje të stokut të coinit** afatgjatë.
+
+---
+
+### 2️⃣ Struktura bazë – 70% SPOT + 30% FUTURES SHORT
+
+Konfigurimi standard:
+
+- **SPOT**: 70% e kapitalit (pa leverage)
+- **FUTURES SHORT**: 30% e kapitalit si margin
+- **Leverage i futures**: 2x
+- **TP i SHORT-it**: p.sh. 2% rënie e çmimit
+- **SL i SHORT-it**: p.sh. 6% ngritje e çmimit
+
+Kjo do të thotë:
+
+- Pozicioni short në futures është i madh **sa 60% e kapitalit** (sepse: 30% margin × 2x = 60% ekspozim)
+- SPOT mban 70% ekspozim në drejtim LONG
+- Diferenca mes 70% long dhe 60% short = vetëm **10% ekspozim neto** ndaj tregut
+
+Pra, nuk je "all in" as në long, as në short → **hedging i fortë**.
+
+---
+
+### 3️⃣ Procesi hap pas hapi – si funksionon një cikël i vetëm
+
+Le të marrim shembullin standard:
+- Ndarja: **70% SPOT / 30% FUTURES SHORT**
+- Leverage: **2x**
+- TP: **−2%** (çmimi bie 2%)
+- SL: **+6%** (çmimi ngrihet 6%)
+
+#### a) Hapi 1 – Hyrja në treg
+1. Blen coinin në SPOT (70% e kapitalit).
+2. Hap një pozicion **SHORT** në futures me 2x (30% margin → 60% ekspozim).
+3. Vendos TP e short-it në −2% dhe SL të short-it në +6%.
+
+#### b) Hapi 2 – Nëse çmimi BIE (arrin TP)
+
+- SPOT humb rreth −2% mbi pjesën 70%.
+- FUTURES SHORT fiton rreth +2% mbi pjesën 60% (me lev 2x).
+- Pjesa e fitimit nga futures është më e madhe se humbja e SPOT-it ose është shumë afër, në varësi të saktësimit të parametrave.
+
+**Çfarë bën ti?**
+
+- Mbyll SHORT-in në TP.
+- Fitimin e futures e hedh te SPOT (blerje coini më lirë).
+- Pret që çmimi të kthehet në 0% (entry).
+
+Kur çmimi kthehet në entry:
+- Vlera në USDT është afër ose mbi kapitalin fillestar.
+- **Numri i coin-ve është më i madh** → i ke shtuar coinit pa u rrezikuar shumë.
+
+#### c) Hapi 3 – Nëse çmimi NGRIHET (arrin SL)
+
+- SPOT fiton +6% mbi pjesën 70%.
+- FUTURES SHORT humb −6% mbi pjesën 60% (me lev 2x).
+
+Me këtë konfigurim (2% TP, 6% SL, 2x lev, 70/30) rezulton që:
+
+- Në SL zakonisht del **afër zeros ose në fitim të vogël**, sepse SPOT-i është më i madh se short-i.
+
+Pra:
+- **Në rënie (TP)**: fiton coin + P&L shpesh pozitiv.
+- **Në ngritje (SL)**: SPOT shpesh mbulon humbjen e short-it.
+
+---
+
+### 4️⃣ Si përdoret RSI në strategjinë 70/30
+
+RSI nuk është detyrimisht pjesë e formulës matematikore. Ai shërben si **filtri** kur të aktivizosh strategjinë, që të mos futesh në mes të "zonës së mesme" ku çmimi lëkundet pa drejtim.
+
+Shembull përdorimi:
+
+- **RSI 4H / 1H**
+  - Kur RSI është **shumë i lartë** (p.sh. mbi 70–75) → tregon se çmimi është i “zgjatur” në lartësi  
+    → është më logjike të kërkosh hyrje për **SHORT + SPOT 70/30**, sepse mund të pasojë një korrigjim (rënia prej 2% për TP është shumë e arsyeshme).
+  - Kur RSI është **shumë i ulët** (p.sh. nën 30–25) → tregon se çmimi është i “oversold”  
+    → mund të zgjedhësh të mos hapësh short të ri, por të presësh që çmimi të rikthehet lart.
+
+**Ideja kryesore:**
+- Strategjia 70/30 është matematikisht e menduar, por RSI të ndihmon **kur** ta aplikosh, në mënyrë që valët 2–6% të kenë më shumë gjasa të ndodhin.
+
+---
+
+### 5️⃣ Shembulli teorik: 10 herë në ditë (5 her TP, 5 her SL)
+
+Le të mbajmë parametrat standard:
+- 70% SPOT
+- 30% FUTURES SHORT
+- Leverage 2x
+- TP = −2%
+- SL = +6%
+
+Me këto vlera, për çdo 10,000 USDT, dalin afërsisht:
+
+- **Fitim në një TP-cikël (rënia −2% dhe rikthimi në 0%)** ≈ **+1.22%** të kapitalit  
+- **Fitim në një SL-cikël (+6% lart)** ≈ **+0.60%** të kapitalit
+
+Nëse teorikisht:
+- 5 cikle mbyllen në TP
+- 5 cikle mbyllen në SL
+
+atëherë, në total:
+
+- Fitimi ditor ≈ **5 × 1.22% + 5 × 0.60% ≈ 9.1% e kapitalit**
+
+Ky është **shembull teorik**, pa marrë parasysh:
+- komisionet,
+- slippage,
+- limitet reale të tregut,
+- oraret kur s’ka volum.
+
+Prandaj kjo shifër shërben **vetëm për ilustrim**, jo si premtim.
+
+---
+
+### 6️⃣ Tabelë shembull: 70/30, lev 2x, TP 2%, SL 6%, 10 cikle (5 TP, 5 SL)
+
+Më poshtë ke një tabelë teorike me kapitale të ndryshme:
+- 1,000 – 2,000 – 3,000 – 4,000 – 5,000 – 10,000 USDT  
+- Për secilin kapital tregohet:
+  - fitimi nga 1 TP,
+  - fitimi nga 1 SL,
+  - fitimi ditor nëse bën 5 TP + 5 SL.
+
+**Kjo nuk është garanci**, por një mënyrë për ta kuptuar shkallëzimin e strategjisë.
+""")
+
+    # ====== TABELA TEORIKE PËR KAPITALE TË NDRYSHME ======
+    caps = [1000, 2000, 3000, 4000, 5000, 10000]
+    rows = []
+
+    tp_down_percent_example = 2.0   # −2% TP
+    sl_up_percent_example = 6.0     # +6% SL
+    spot_pct_example = 70.0
+    futures_pct_example = 30.0
+    leverage_example = 2.0
+
+    d_tp_example = tp_down_percent_example / 100.0
+    u_sl_example = sl_up_percent_example / 100.0
+
+    for cap in caps:
+        spot_cap_ex = cap * spot_pct_example / 100.0
+        fut_margin_ex = cap * futures_pct_example / 100.0
+        fut_notional_ex = fut_margin_ex * leverage_example
+
+        # TP – sipas formulës së kodit kryesor
+        spot_loss_tp_ex = spot_cap_ex * d_tp_example
+        fut_profit_tp_ex = fut_notional_ex * d_tp_example
+        spot_after_tp_ex = (spot_cap_ex - spot_loss_tp_ex) + fut_profit_tp_ex
+        spot_final_tp_ex = spot_after_tp_ex / (1 - d_tp_example)
+        total_final_tp_ex = spot_final_tp_ex + fut_margin_ex
+        pnl_tp_ex = total_final_tp_ex - cap
+
+        # SL – sipas formulës së kodit kryesor
+        spot_profit_sl_ex = spot_cap_ex * u_sl_example
+        fut_loss_sl_ex = fut_notional_ex * u_sl_example
+        pnl_sl_ex = spot_profit_sl_ex - fut_loss_sl_ex
+
+        daily_pnl_if_5_5 = 5 * pnl_tp_ex + 5 * pnl_sl_ex
+
+        rows.append({
+            "Kapitali (USDT)": cap,
+            "Fitimi nga 1 TP (≈)": round(pnl_tp_ex, 2),
+            "Fitimi nga 1 SL (≈)": round(pnl_sl_ex, 2),
+            "Fitim ditor (5 TP + 5 SL) (≈)": round(daily_pnl_if_5_5, 2)
+        })
+
+    df_example = pd.DataFrame(rows)
+
+    st.markdown("### 📊 Tabela teorike e ElBuni 70/30 (TP 2%, SL 6%, lev 2x)")
+
+    st.dataframe(df_example, use_container_width=True)
+
+    st.info(
+        "⚠️ Kjo tabelë është thjesht shembull teorik bazuar në parametrat standard: "
+        "70% SPOT / 30% FUTURES, lev 2x, TP 2%, SL 6%, 5 cikle në TP dhe 5 cikle në SL në ditë. "
+        "Në treg real rezultatet ndryshojnë nga koha, volumi, komisionet dhe luhatjet e papritura."
+    )
+
+    st.markdown("""
+---
+
+### 7️⃣ Rreziqet kryesore të strategjisë
+
+Edhe pse është strategji me rrezik të ulët krahasuar me “all in futures”, rreziqet ekzistojnë:
+
+1. **Lëvizje ekstreme pa rikthim**  
+   - Nëse çmimi bie shumë më tepër se −2% dhe nuk kthehet për një kohë të gjatë, mund të mos arrish të realizosh ciklin TP → rikthim në 0%.
+   - Nëse çmimi rritet shumë shpejt, SL mund të kapet disa herë pa arritur balancimin.
+
+2. **Likuidimi në futures nëse rrit leverage pa kufi**  
+   - Strategjia është menduar për **lev 2x**.
+   - Nëse e çon leverage më lart, rrit rrezikun e likuidimit.
+
+3. **Komisionet dhe funding-u**  
+   - Shumë hapje/mbyllje pozicionesh = më shumë komisione.
+   - Nëse mban futures gjatë, funding-u mund të hajë një pjesë të fitimit.
+
+4. **Psikologjia**  
+   - Mund të tundohesh të mos respektosh rregullat:
+     - nuk mbyll në TP
+     - nuk pranon SL
+   - Sapo fillon “ta shpikësh” gjatë lojës, prishet struktura e strategjisë.
+
+---
+
+### 8️⃣ Si duhen vendosur SL dhe TP (praktikisht)
+
+1. **TP i short-it (rënia)**  
+   - Zakonisht vendoset **i vogël** (p.sh. 1–3%).  
+   - Që të marrësh valët e shpeshta të çmimit.
+
+2. **SL i short-it (ngritja)**  
+   - Më i gjerë se TP (p.sh. 4–8%).  
+   - Që të mos të nxjerrë nga loja për çdo lëvizje të vogël.
+
+3. **Stop Loss nuk zhvendoset më thellë në humbje**  
+   - Maksimumi mund ta afrosh drejt entry-t (BE – break even) kur pozicioni është shumë në fitim.
+   - Por mos e largosh SL-in më poshtë vetëm që “mos të goditet”, sepse kështu mund të hapësh derën për humbje të mëdha.
+
+4. **Respekto rregullat**  
+   - Vendos TP / SL sapo hap pozicionin.
+   - Mos i ndrysho emocionalisht, por vetëm sipas rregullit të strategjisë.
+
+---
+
+### 9️⃣ Përfundimi – çfarë duhet të kuptojë lexuesi
+
+Nga ky manual, lexuesi duhet të kuptojë se:
+
+- ElBuni Strategy 70/30 është një sistem:
+  - që **kombinon SPOT + FUTURES SHORT**
+  - me **raport 70/30** dhe **lev 2x**
+  - me **TP të vogël** dhe **SL më të gjerë**
+- Qëllimi nuk është të “godasësh jackpot-in”, por:
+  - të mbrosh kapitalin
+  - të shtosh coin gradualisht
+  - të fitosh nga valët natyrale të tregut
+- RSI shërben si **filter hyrjeje**, jo si magji:
+  - e ndihmon strategjinë, nuk e zëvendëson
+- Çdo shembull fitimi është **teorik**, tregu real ka:
+  - rreziqe
+  - komisione
+  - situata ekstreme
+
+Prandaj strategjia duhet parë si **mjet menaxhimi rreziku + akumulim coini**, jo si garanci pasurimi të shpejtë.
 """)
 
 # ======================== TAB 3: ELBUNI GRID (SPOT) ========================
@@ -561,21 +795,21 @@ with tab_shields:
             short_notional = short_margin_tri * short_leverage
             long_notional = long_margin_tri * long_leverage
 
-            d = move_down / 100
-            u = move_up / 100
+            d_tri = move_down / 100
+            u_tri = move_up / 100
 
             # Skenari rënie
-            spot_loss_down = spot_cap_tri * d
-            short_profit_down = short_notional * d
-            long_loss_down = long_notional * d
+            spot_loss_down = spot_cap_tri * d_tri
+            short_profit_down = short_notional * d_tri
+            long_loss_down = long_notional * d_tri
 
             pnl_down = -spot_loss_down + short_profit_down - long_loss_down
             total_down = tri_cap + pnl_down
 
             # Skenari ngritje
-            spot_profit_up = spot_cap_tri * u
-            short_loss_up = short_notional * u
-            long_profit_up = long_notional * u
+            spot_profit_up = spot_cap_tri * u_tri
+            short_loss_up = short_notional * u_tri
+            long_profit_up = long_notional * u_tri
 
             pnl_up = spot_profit_up - short_loss_up + long_profit_up
             total_up = tri_cap + pnl_up
