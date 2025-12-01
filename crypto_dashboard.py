@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
+from PIL import Image
+import os  # për ruajtjen e logos në disk
 
 # ======================== KONFIGURIMI BAZË ========================
 st.set_page_config(
-    page_title="ElBuni PRO Shields",
-    page_icon="🛡",
+    page_title="ElBuni Strategy PRO – TP & SL + Manual + GRID",
+    page_icon="💹",
     layout="wide"
 )
 
@@ -25,7 +27,7 @@ st.markdown("""
     margin-bottom: 10px;
 }
 .elb-title {
-    font-size: 32px;
+    font-size: 34px;
     font-weight: 700;
     color: #00f5d4;
     text-shadow: 0 0 14px rgba(0, 245, 212, 0.6);
@@ -42,404 +44,448 @@ st.markdown("""
     border-radius: 12px;
     overflow: hidden;
 }
+.copy-btn {
+    margin-top: 8px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(34, 197, 94, 0.8);
+    background: radial-gradient(circle at top left, #16a34a, #14532d);
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+}
+.copy-btn:hover {
+    box-shadow: 0 0 14px rgba(34, 197, 94, 0.8);
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ======================== HEADER ========================
-st.markdown("""
-<div class="elb-card">
-  <div class="elb-title">🛡 ElBuni PRO Shields</div>
-  <div style="font-size:15px;color:#cbd5f5;">
-    Laborator për mbrojtjen profesionale të kapitalit: TRI-HEDGE, Wave Shield dhe Auto-Adjust SL.
-  </div>
-</div>
-""", unsafe_allow_html=True)
-
-st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-
-# ======================== PRICE HELPER – LLOGARIT ÇMIMIN NGA % ========================
-st.markdown("### 📐 Price Helper – Llogarit çmimin nga përqindjet që shkruan vet")
-
-col_price_1, col_price_2 = st.columns(2)
-with col_price_1:
-    entry_price = st.number_input(
-        "💲 Çmimi hyrës (entry)",
-        min_value=0.0,
-        value=0.00000457,
-        format="%.10f",
-        key="helper_entry"
-    )
-with col_price_2:
-    pct_text = st.text_input(
-        "📊 Përqindjet (shkruaj vet, p.sh. -2, 1.5, 3, -5)",
-        value="-2, 1, 2, 3, 4, 5",
-        key="helper_pcts"
+# ======================== SIDEBAR – UPLOAD LOGO ========================
+with st.sidebar:
+    st.markdown("### 🔰 Logo ElBuni")
+    uploaded_logo = st.file_uploader(
+        "Ngarko logon ElBuni (PNG / JPG)",
+        type=["png", "jpg", "jpeg"]
     )
 
-if entry_price > 0 and pct_text.strip() != "":
-    percents = []
-    for part in pct_text.replace(";", ",").split(","):
-        part = part.strip()
-        if part == "":
-            continue
-        try:
-            percents.append(float(part))
-        except ValueError:
-            pass  # injoro input jo valid
+# ======================== LOGO PERSISTENTE NË DISK ========================
+LOGO_PATH = "uploads/el_buni_logo.png"
+os.makedirs("uploads", exist_ok=True)
 
-    if percents:
-        rows = []
-        for p in percents:
-            new_price = entry_price * (1 + p/100.0)
-            rows.append({
-                "Lëvizja (%)": p,
-                "Çmimi i ri": float(f"{new_price:.10f}")
-            })
+if uploaded_logo is not None:
+    try:
+        with open(LOGO_PATH, "wb") as f:
+            f.write(uploaded_logo.getbuffer())
+    except Exception as e:
+        st.sidebar.write("❌ Nuk u ruajt logoja:", e)
 
-        df_price = pd.DataFrame(rows).sort_values("Lëvizja (%)")
-        st.markdown("#### 📊 Tabela e çmimeve sipas përqindjeve")
-        st.dataframe(df_price, use_container_width=True)
-    else:
-        st.info("Shkruaj përqindje valide, p.sh. -2, 1, 3.5, -5")
+logo_to_show = None
+if os.path.exists(LOGO_PATH):
+    try:
+        logo_to_show = Image.open(LOGO_PATH)
+    except:
+        logo_to_show = None
 
-st.markdown("---")
+# ======================== HEADER ME LOGO ========================
+st.markdown("")
 
-# ======================== ZGJEDH SHIELD ========================
-mode = st.selectbox(
-    "Zgjidh shield-in:",
-    ["ElBuni TRI-HEDGE", "ElBuni Wave Shield", "ElBuni Auto-Adjust PRO"]
+if logo_to_show is not None:
+    st.image(logo_to_show, use_column_width=False, width=420)
+else:
+    st.markdown("### 💹 ElBuni Strategy PRO")
+
+st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+
+# ======================== TABS ========================
+tab_calc, tab_manual, tab_grid = st.tabs(
+    ["🧮 Kalkulatori", "📘 Manuali i Strategjisë", "🧱 ElBuni GRID"]
 )
 
-# =========================================================
-# 1) TRI-HEDGE – SPOT + SHORT + LONG
-# =========================================================
-if mode == "ElBuni TRI-HEDGE":
-    st.markdown("### 🥇 ElBuni TRI-HEDGE – SPOT + SHORT + LONG")
+# ======================== TAB 1: KALKULATORI KRYESOR ========================
+with tab_calc:
+    st.markdown("### ⚙️ Zgjedh konfigurimin tënd (Hedging SPOT + FUTURES SHORT)")
 
-    colA, colB = st.columns(2)
+    colA, colB, colC = st.columns(3)
+
     with colA:
-        tri_cap = st.number_input(
-            "💰 Kapitali total (USDT)",
+        investimi_total = st.number_input(
+            "💰 Investimi total (USDT)",
             min_value=0.0,
             value=5000.0,
-            step=100.0,
-            key="tri_cap"
+            step=100.0
         )
+
     with colB:
-        short_leverage = st.number_input(
-            "⚙️ Leverage SHORT (x)",
+        spot_pct = st.slider("📊 SPOT (%)", 0, 100, 70)
+
+    with colC:
+        leverage = st.number_input(
+            "⚙️ Leverage Futures (x)",
             min_value=1.0,
             max_value=10.0,
             value=2.0,
-            step=0.5,
-            key="tri_short_lev"
+            step=0.5
         )
 
-    colP1, colP2, colP3 = st.columns(3)
-    with colP1:
-        tri_spot_pct = st.slider("📊 SPOT (%)", 0, 100, 60, key="tri_spot_pct")
-    with colP2:
-        tri_short_pct = st.slider(
-            "📉 SHORT futures (%)",
-            0,
-            100 - tri_spot_pct,
-            20,
-            key="tri_short_pct"
-        )
-    with colP3:
-        tri_long_pct = 100 - tri_spot_pct - tri_short_pct
-        st.markdown(f"**📈 LONG futures (%) = {tri_long_pct}%**")
+    futures_pct = 100 - spot_pct
+    st.markdown(f"**📉 FUTURES short (%) = {futures_pct}%**")
 
-    colMv = st.columns(2)
-    with colMv[0]:
-        move_down = st.number_input(
-            "📉 Skenari rënie (−%)",
+    st.markdown("---")
+
+    colTP, colSL = st.columns(2)
+
+    with colTP:
+        tp_down_percent = st.number_input(
+            "🎯 Take Profit short (rënia −%)",
             min_value=0.1,
             max_value=80.0,
-            value=5.0,
-            step=0.1,
-            key="tri_down"
-        )
-    with colMv[1]:
-        move_up = st.number_input(
-            "📈 Skenari ngritje (+%)",
-            min_value=0.1,
-            max_value=80.0,
-            value=5.0,
-            step=0.1,
-            key="tri_up"
+            value=2.0,
+            step=0.1
         )
 
-    long_leverage = st.number_input(
-        "⚙️ Leverage LONG (x)",
-        min_value=1.0,
-        max_value=10.0,
-        value=1.5,
-        step=0.5,
-        key="tri_long_lev"
+    with colSL:
+        sl_up_percent = st.number_input(
+            "🛑 Stop Loss short (ngritja +%)",
+            min_value=0.1,
+            max_value=80.0,
+            value=6.0,
+            step=0.1
+        )
+
+    price_entry = st.number_input(
+        "💲 Çmimi hyrës (entry) – si në Binance",
+        min_value=0.0,
+        value=0.00000457,
+        format="%.10f"
     )
 
     st.markdown("---")
 
-    if tri_cap > 0:
-        # Ndarja e kapitalit
-        spot_cap_tri = tri_cap * tri_spot_pct / 100.0
-        short_margin_tri = tri_cap * tri_short_pct / 100.0
-        long_margin_tri = tri_cap * tri_long_pct / 100.0
+    # ======================== ÇMIMET TP & SL ========================
+    if price_entry > 0:
+        tp_price = price_entry * (1 - tp_down_percent/100)
+        sl_price = price_entry * (1 + sl_up_percent/100)
 
-        short_notional = short_margin_tri * short_leverage
-        long_notional = long_margin_tri * long_leverage
+        st.markdown("### 💲 Çmimet për Binance")
 
-        d = move_down / 100.0
-        u = move_up / 100.0
+        ct1, ct2 = st.columns(2)
 
-        # ---- Skenari rënie (−%) ----
-        spot_loss_down = spot_cap_tri * d
-        short_profit_down = short_notional * d
-        long_loss_down = long_notional * d
+        with ct1:
+            st.markdown('<div class="elb-card">📉 Çmimi TP</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-value">{tp_price:.10f}</div>', unsafe_allow_html=True)
 
-        pnl_down = -spot_loss_down + short_profit_down - long_loss_down
-        total_down = tri_cap + pnl_down
+        with ct2:
+            st.markdown('<div class="elb-card">📈 Çmimi SL</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-value">{sl_price:.10f}</div>', unsafe_allow_html=True)
 
-        # ---- Skenari ngritje (+%) ----
-        spot_profit_up = spot_cap_tri * u
-        short_loss_up = short_notional * u
-        long_profit_up = long_notional * u
+        # --------- TABELA E ÇMIMEVE PËR +1…+6% DHE −2% ---------
+        rows_levels = []
+        for i in range(1, 7):
+            price_plus = price_entry * (1 + i / 100.0)
+            rows_levels.append({
+                "Lëvizja": f"+{i}%",
+                "Çmimi": f"{price_plus:.10f}"
+            })
 
-        pnl_up = spot_profit_up - short_loss_up + long_profit_up
-        total_up = tri_cap + pnl_up
+        price_minus2 = price_entry * (1 - 2 / 100.0)
+        rows_levels.append({
+            "Lëvizja": "-2%",
+            "Çmimi": f"{price_minus2:.10f}"
+        })
 
-        tri_df = pd.DataFrame([{
-            "Kapitali total": tri_cap,
-            "SPOT (USDT)": spot_cap_tri,
-            "SHORT margin": short_margin_tri,
-            "LONG margin": long_margin_tri,
-            "SHORT notional": short_notional,
-            "LONG notional": long_notional,
-            "P&L në rënie (USDT)": pnl_down,
-            "Kapitali në rënie": total_down,
-            "P&L në ngritje (USDT)": pnl_up,
-            "Kapitali në ngritje": total_up
-        }])
+        df_levels = pd.DataFrame(rows_levels)
+        st.markdown("### 📌 Çmimet për lëvizjet % (gati për TP / SL)")
+        st.dataframe(df_levels, use_container_width=True)
 
-        st.markdown("### 📊 Rezultatet TRI-HEDGE")
-        st.dataframe(tri_df, use_container_width=True)
-
-        colR1, colR2 = st.columns(2)
-        with colR1:
-            st.metric("P&L në rënie", f"{pnl_down:,.2f} USDT")
-        with colR2:
-            st.metric("P&L në ngritje", f"{pnl_up:,.2f} USDT")
-
-        st.markdown("""
-**🧠 Ideja e TRI-HEDGE:**
-- Në rënie → SHORT të mbron, SPOT humbet, LONG humb pak → P&L afër zeros.
-- Në ngritje → SPOT + LONG fitojnë, SHORT humb → P&L priret të jetë në plus.
-
-E mirë kur nuk je i sigurt në drejtimin e tregut, por do të ulësh rrezikun total.
-""")
-
-
-# =========================================================
-# 2) WAVE SHIELD – VALË lart/poshtë me TP të vegjël
-# =========================================================
-elif mode == "ElBuni Wave Shield":
-    st.markdown("### 🌊 ElBuni Wave Shield – Mbrojtje me Valë")
-
-    colA, colB = st.columns(2)
-    with colA:
-        wave_cap = st.number_input(
-            "💰 Kapitali total për Wave Shield (USDT)",
-            min_value=0.0,
-            value=2000.0,
-            step=50.0,
-            key="wave_cap"
-        )
-        wave_short_levels = st.number_input(
-            "📉 Numri i TP Short (valët poshtë)",
-            min_value=1,
-            max_value=10,
-            value=3,
-            key="wave_short_levels"
-        )
-    with colB:
-        wave_long_levels = st.number_input(
-            "📈 Numri i TP Long (valët lart)",
-            min_value=1,
-            max_value=10,
-            value=2,
-            key="wave_long_levels"
-        )
-        wave_tp_each = st.number_input(
-            "🎯 TP për çdo valë (+/− %)",
-            min_value=0.1,
-            max_value=20.0,
-            value=1.5,
-            step=0.1,
-            key="wave_tp_each"
-        )
+    else:
+        st.info("✋ Shkruaj një çmim hyrës > 0 që të llogariten TP/SL dhe tabela e çmimeve.")
 
     st.markdown("---")
 
-    if wave_cap > 0:
-        cap_short = wave_cap * 0.5
-        cap_long = wave_cap * 0.5
+    # ======================== LLOGARITJET ========================
+    if investimi_total > 0:
 
-        per_short = cap_short / wave_short_levels
-        per_long = cap_long / wave_long_levels
+        spot_cap = investimi_total * spot_pct / 100
+        fut_margin = investimi_total * futures_pct / 100
+        fut_notional = fut_margin * leverage
 
-        tp_fraction = wave_tp_each / 100.0
+        d_tp = tp_down_percent / 100
+        u_sl = sl_up_percent / 100
 
-        profit_per_short = per_short * tp_fraction
-        profit_per_long = per_long * tp_fraction
+        # ---------- TP ----------
+        spot_loss_tp = spot_cap * d_tp
+        fut_profit_tp = fut_notional * d_tp
 
-        total_profit_short = profit_per_short * wave_short_levels
-        total_profit_long = profit_per_long * wave_long_levels
-        total_profit_cycle = total_profit_short + total_profit_long
+        spot_after_tp = (spot_cap - spot_loss_tp) + fut_profit_tp
+        spot_final_tp = spot_after_tp / (1 - d_tp)
 
-        wave_df = pd.DataFrame([{
-            "Kapital total": wave_cap,
-            "Kapital për SHORT-valë": cap_short,
-            "Kapital për LONG-valë": cap_long,
-            "Fitim total SHORT-valë": total_profit_short,
-            "Fitim total LONG-valë": total_profit_long,
-            "Fitim total/cikël": total_profit_cycle
+        total_final_tp = spot_final_tp + fut_margin
+        pnl_total_tp = total_final_tp - investimi_total
+
+        # coin-at nëse kemi entry
+        coins_initial = coins_from_fut = coins_total = None
+        if price_entry > 0:
+            price_after_drop = price_entry * (1 - d_tp)
+            if price_after_drop > 0:
+                coins_initial = spot_cap / price_entry
+                coins_from_fut = fut_profit_tp / price_after_drop
+                coins_total = coins_initial + coins_from_fut
+
+        # ---------- SL ----------
+        spot_profit_sl = spot_cap * u_sl
+        fut_loss_sl = fut_notional * u_sl
+
+        pnl_sl = spot_profit_sl - fut_loss_sl
+        total_sl = investimi_total + pnl_sl
+
+        # ======================== TABELAT ========================
+        st.markdown("### 📘 TP – rikthimi në 0%")
+        tp_row = {
+            "Investimi total": investimi_total,
+            "SPOT %": spot_pct,
+            "FUTURES %": futures_pct,
+            "Leverage": leverage,
+            "TP −%": tp_down_percent,
+            "Fitimi FUTURES": fut_profit_tp,
+            "Humbja SPOT": spot_loss_tp,
+            "Totali final": total_final_tp,
+            "P&L final": pnl_total_tp
+        }
+        if coins_total is not None:
+            tp_row["Coin fillestarë"] = coins_initial
+            tp_row["Coin nga FUTURES"] = coins_from_fut
+            tp_row["Coin total në 0%"] = coins_total
+
+        tp_df = pd.DataFrame([tp_row])
+        st.dataframe(tp_df, use_container_width=True)
+
+        st.markdown("### 📕 SL – ngritja +%")
+        sl_df = pd.DataFrame([{
+            "Investimi total": investimi_total,
+            "SPOT %": spot_pct,
+            "FUTURES %": futures_pct,
+            "Leverage": leverage,
+            "SL +%": sl_up_percent,
+            "Fitimi SPOT": spot_profit_sl,
+            "Humbja FUTURES": fut_loss_sl,
+            "Totali final": total_sl,
+            "P&L final": pnl_sl
         }])
+        st.dataframe(sl_df, use_container_width=True)
 
-        st.markdown("### 📊 Rezultatet e një cikli Wave Shield")
-        st.dataframe(wave_df, use_container_width=True)
+        # ======================== PËRMBLEDHJE ========================
+        sign_tp = "+" if pnl_total_tp >= 0 else ""
+        sign_sl = "+" if pnl_sl >= 0 else ""
 
-        colW1, colW2 = st.columns(2)
-        with colW1:
-            st.metric("Fitim total/cikël", f"{total_profit_cycle:,.2f} USDT")
-        with colW2:
-            perc = (total_profit_cycle / wave_cap * 100.0) if wave_cap > 0 else 0.0
-            st.metric("Fitim % mbi kapitalin", f"{perc:.2f} %")
+        st.markdown("### 🧾 Përmbledhja e konfigurimit tënd")
 
-        st.markdown("""
-**🧠 Si funksionon Wave Shield:**
-- 50% e kapitalit punon në valët poshtë (TP short të vegjël).
-- 50% në valët lart (TP long të vegjël).
-- Sa herë çmimi bën zig-zag, ti mbyll TP të vogla dhe mbledh fitime,
-  pa pasur nevojë të parashikosh bull ose bear afatgjatë.
+        st.markdown(f"""
+**💰 Çfarë ke futur:**
+- Investimi total: **{investimi_total:,.2f} USDT**
+- SPOT ({spot_pct}%): **{spot_cap:,.2f} USDT**
+- FUTURES margin ({futures_pct}%): **{fut_margin:,.2f} USDT**
+- Leverage i futures: **x{leverage}**
 """)
 
+        st.markdown("#### 🎯 Skenari TP – çmimi bie dhe kthehet në 0%")
 
-# =========================================================
-# 3) AUTO-ADJUST PRO – Trailing SL inteligjent
-# =========================================================
-elif mode == "ElBuni Auto-Adjust PRO":
-    st.markdown("### 🤖 ElBuni Auto-Adjust PRO – Stop Loss inteligjent")
+        st.markdown(f"""
+- Rënia e çmimit: **-{tp_down_percent:.2f}%**
+- Humbja në SPOT: **{spot_loss_tp:,.2f} USDT**
+- Fitimi në FUTURES: **{fut_profit_tp:,.2f} USDT**
+- Kapitali final në rikthim: **{total_final_tp:,.2f} USDT**
+- P&L total: **{sign_tp}{pnl_total_tp:,.2f} USDT**
+""")
+
+        if coins_total is not None:
+            st.markdown(f"""
+**📈 Coin-at:**
+- Coin fillestarë: **{coins_initial:,.2f}**
+- Coin nga futures: **{coins_from_fut:,.2f}**
+- Coin total: **{coins_total:,.2f}**
+""")
+
+        st.markdown("#### 🛑 Skenari SL – çmimi rritet")
+
+        st.markdown(f"""
+- Ngritja e çmimit: **+{sl_up_percent:.2f}%**
+- Fitimi SPOT: **{spot_profit_sl:,.2f} USDT**
+- Humbja FUTURES: **{fut_loss_sl:,.2f} USDT**
+- P&L final: **{sign_sl}{pnl_sl:,.2f} USDT**
+- Kapitali final: **{total_sl:,.2f} USDT**
+""")
+
+# ======================== TAB 2: MANUALI ========================
+with tab_manual:
+    st.markdown("## 📘 Manuali i Strategjisë ElBuni (lev 2x)")
 
     st.markdown("""
-Ky modul simulon një **trailing SL** që afrohet sa herë çmimi lëviz në favorin tënd.
-Mban nën kontroll humbjen maksimale dhe fillon të “bllokojë” fitimin.
+### 1️⃣ Çfarë është ElBuni Strategy?
+Një strategji e balancuar SPOT + FUTURES SHORT ku fiton:
+- Kur bie çmimi  
+- Kur rritet çmimi  
+- Kur kthehet në 0% (fiton coin)
+
+### 2️⃣ Struktura bazë
+- SPOT: 70%  
+- FUTURES: 30%  
+- Leverage: 2x  
+
+### 3️⃣ Çfarë ndodh në TP?
+- FUTURES fiton  
+- SPOT humbet pak  
+- Fitimi i futures hidhet te SPOT  
+➡️ Rezultat: Më shumë coin kur rikthehet çmimi në 0%
+
+### 4️⃣ Çfarë ndodh në SL?
+- SPOT fiton shumë  
+- FUTURES humb  
+➡️ Me lev 2x zakonisht afër zeros ose fitim i vogël
+
+### 5️⃣ Avantazhet
+- Rrezik shumë i ulët  
+- TP të shpejta  
+- Shton coin çdo cikël  
+- Perfect për tregje me valë  
 """)
 
-    colA, colB = st.columns(2)
-    with colA:
-        auto_cap = st.number_input(
-            "💰 Kapitali i pozicionit (USDT)",
-            min_value=0.0,
-            value=1000.0,
-            step=50.0,
-            key="auto_cap"
-        )
-        risk_pct = st.number_input(
-            "⚠️ Rreziku maksimal fillestar (% kapitalit)",
-            min_value=0.1,
-            max_value=20.0,
-            value=2.0,
-            step=0.1,
-            key="auto_risk"
-        )
-        initial_sl_dist = st.number_input(
-            "📍 Distanca fillestare SL nga entry (+/− %)",
-            min_value=0.1,
-            max_value=20.0,
-            value=4.0,
-            step=0.1,
-            key="auto_sl_dist"
-        )
-    with colB:
-        trail_trigger = st.number_input(
-            "🚦 Aktivizo trailing kur çmimi lëviz (+%)",
-            min_value=0.1,
-            max_value=20.0,
-            value=2.0,
-            step=0.1,
-            key="auto_trigger"
-        )
-        trail_step = st.number_input(
-            "📈 Sa % afrohet SL për çdo +1% shtesë",
-            min_value=0.1,
-            max_value=10.0,
-            value=1.0,
-            step=0.1,
-            key="auto_trail"
-        )
-        move_up_now = st.number_input(
-            "📊 Sa % ka lëvizur çmimi në favorin tënd (+%)",
-            min_value=0.0,
-            max_value=200.0,
-            value=3.0,
-            step=0.1,
-            key="auto_move"
-        )
+# ======================== TAB 3: ELBUNI GRID (SPOT) ========================
+with tab_grid:
+    st.markdown("## 🧱 ElBuni GRID – Mini-Grid SPOT për PEPE/XVG")
+
+    st.markdown("""
+Strategji shumë e sigurt për luhatje të vogla:
+
+- Vendos disa **BUY** në rënie  
+- Vendos **TP** të vegjël për çdo nivel  
+- Çdo cikël sjell fitim të vogël + shtim të coinit  
+""")
 
     st.markdown("---")
 
-    if auto_cap > 0 and initial_sl_dist > 0:
-        initial_risk_usdt = auto_cap * risk_pct / 100.0
+    col1, col2 = st.columns(2)
 
-        if move_up_now <= trail_trigger:
-            current_sl_dist = initial_sl_dist
-        else:
-            extra_move = move_up_now - trail_trigger
-            current_sl_dist = max(0.0, initial_sl_dist - extra_move * trail_step)
+    with col1:
+        total_cap_grid = st.number_input(
+            "💰 Kapitali për GRID (USDT)",
+            min_value=10.0,
+            value=200.0,
+            step=10.0,
+            key="grid_cap"
+        )
 
-        current_max_loss_pct = risk_pct * (current_sl_dist / initial_sl_dist)
-        current_max_loss_usdt = auto_cap * current_max_loss_pct / 100.0
+        step_percent = st.number_input(
+            "📉 Distanca mes BUY-ve (−%)",
+            min_value=0.1,
+            max_value=50.0,
+            value=1.0,
+            step=0.1,
+            key="grid_step"
+        )
 
-        locked_profit = max(0.0, initial_risk_usdt - current_max_loss_usdt)
+    with col2:
+        grid_levels = st.number_input(
+            "📊 Numri i niveleve",
+            min_value=1,
+            max_value=20,
+            value=5,
+            key="grid_levels"
+        )
 
-        auto_df = pd.DataFrame([{
-            "Kapital i pozicionit": auto_cap,
-            "Rrezik fillestar %": risk_pct,
-            "Rrezik fillestar (USDT)": initial_risk_usdt,
-            "Distanca fillestare SL (%)": initial_sl_dist,
-            "Lëvizja aktuale e çmimit (+%)": move_up_now,
-            "Distanca aktuale SL (%)": current_sl_dist,
-            "Humbja maksimale aktuale (USDT)": current_max_loss_usdt,
-            "Fitim i 'bllokuar' (USDT)": locked_profit
-        }])
+        tp_percent = st.number_input(
+            "📈 TP për çdo nivel (+%)",
+            min_value=0.1,
+            max_value=50.0,
+            value=1.0,
+            step=0.1,
+            key="grid_tp"
+        )
 
-        st.markdown("### 📊 Trailing SL – gjendja aktuale")
-        st.dataframe(auto_df, use_container_width=True)
+    entry_grid = st.number_input(
+        "💲 Çmimi hyrës (PEPE/XVG)",
+        min_value=0.0,
+        value=0.00000457,
+        format="%.10f",
+        key="grid_entry"
+    )
 
-        colM1, colM2, colM3 = st.columns(3)
-        with colM1:
-            st.metric("Rreziku fillestar (USDT)", f"{initial_risk_usdt:,.2f}")
-        with colM2:
-            st.metric("Rreziku maksimal aktual", f"{current_max_loss_usdt:,.2f} USDT")
-        with colM3:
-            st.metric("Fitim i mbrojtur (locked)", f"{locked_profit:,.2f} USDT")
+    st.markdown("---")
 
-        st.markdown("""
-**🧠 Ideja e Auto-Adjust PRO:**
-- Në fillim pranon një rrezik të kufizuar (p.sh. 2% e kapitalit).
-- Kur çmimi ecën në drejtimin tënd, SL afrohet gjithnjë e më shumë.
-- Sa më shumë lëviz çmimi, aq më pak humbje maksimale lejon, dhe një pjesë e fitimit bëhet “e siguruar”.
+    if entry_grid > 0:
+        amount_per_grid = total_cap_grid / grid_levels
 
-Kështu pozicioni yt nuk rri i ekspozuar pa kontroll – është gjithmonë nën mbrojtje dinamike.
-""")
+        buy_prices = []
+        tp_prices = []
+        coins = []
+        profits = []
 
-# ===================== FUND – SQARIM I SHKURTËR ========================
+        for i in range(grid_levels):
+            buy_price = entry_grid * (1 - (step_percent/100) * i)
+            tp_price = buy_price * (1 + tp_percent/100)
+
+            buy_prices.append(buy_price)
+            tp_prices.append(tp_price)
+
+            coin_amount = amount_per_grid / buy_price
+            coins.append(coin_amount)
+
+            profit_usdt = coin_amount * (tp_price - buy_price)
+            profits.append(profit_usdt)
+
+        df_grid = pd.DataFrame({
+            "Niveli": list(range(1, grid_levels + 1)),
+            "BUY Price": buy_prices,
+            "TP Price": tp_prices,
+            "Coins": coins,
+            "Profit/Level (USDT)": profits
+        })
+
+        st.markdown("### 📊 Tabela e GRID-it")
+        st.dataframe(df_grid, use_container_width=True)
+
+        total_profit = sum(profits)
+        total_coins = sum(coins)
+
+        st.markdown("### 📈 Totali i GRID-it")
+        colg1, colg2 = st.columns(2)
+        with colg1:
+            st.metric("Fitimi total (USDT) nëse preken të gjitha TP-të", f"{total_profit:,.4f}")
+        with colg2:
+            st.metric("Coin total që blihen në gjithë GRID-in", f"{total_coins:,.4f}")
+    else:
+        st.info("🪙 Shkruaj një çmim hyrës > 0 për të llogaritur grid-in.")
+
+# ===================== SQARIMI FINAL – PREMIUM POSHTË FAQES ========================
 st.markdown("<hr>", unsafe_allow_html=True)
+
 st.markdown("""
-<div style="font-size:14px;color:#9ca3af;">
-ElBuni PRO Shields punon si shtesë mbi ElBuni Strategy / BP:
-TRI-HEDGE për drejtim të pasigurt, Wave Shield për treg me valë dhe Auto-Adjust PRO për SL inteligjent.
-Price Helper sipër të jep shpejt çmimet për TP/SL nga çdo përqindje që shkruan vet.
+<div class="elb-card" style="
+    margin-top: 20px;
+    border-color: rgba(250, 204, 21, 0.6);
+    box-shadow: 0 0 25px rgba(250, 204, 21, 0.35);
+">
+  <div class="elb-title" style="font-size: 26px; margin-bottom: 10px;">
+    🧩 SQARIMI FINAL – SI FITON STRATEGJIA ELBUNI
+  </div>
+  <div style="font-size: 15px; color: #e5e7eb; line-height: 1.6;">
+    <b>🔥 Fiton edhe kur bie – edhe kur ngrihet</b><br/>
+    • Në <b>TP (rënia)</b> → FUTURES fiton, SPOT humbet pak → TI fiton coin.<br/>
+    • Në <b>SL (ngritja)</b> → SPOT fiton shumë, FUTURES humb pak → TI del afër zeros ose në fitim të vogël.<br/><br/>
+
+    <b>🟩 Pse është e fuqishme?</b><br/>
+    ✔ Shton coin në çdo cikël<br/>
+    ✔ Fiton kur rikthehet çmimi në 0%<br/>
+    ✔ Leverage 2x është shumë i sigurt<br/>
+    ✔ Mbrojtje ndaj luhatjeve<br/><br/>
+
+    <b>🎯 Afatgjatë:</b><br/>
+    🔵 TP të shpeshta → fitim + shtim coin<br/>
+    🔵 SL të rralla → humbje të vogla<br/>
+    🔵 Kapital që rritet pa rrezik likuidimi<br/><br/>
+
+    Kjo e bën <b>ElBuni Strategy</b> + <b>ElBuni GRID</b>
+    një paketë të plotë profesionale për menaxhimin e riskut në kripto.
+  </div>
 </div>
 """, unsafe_allow_html=True)
+```0
