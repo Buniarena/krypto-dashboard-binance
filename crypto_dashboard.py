@@ -83,7 +83,7 @@ logo_to_show = None
 if os.path.exists(LOGO_PATH):
     try:
         logo_to_show = Image.open(LOGO_PATH)
-    except:
+    except Exception:
         logo_to_show = None
 
 # ======================== HEADER ME LOGO ========================
@@ -607,7 +607,6 @@ Ky kombinim ul shumë rrezikun e drejtimit të gabuar të tregut.
         st.markdown("---")
 
         if wave_cap > 0:
-            # 50% kapital për short-valë, 50% për long-valë
             cap_short = wave_cap * 0.5
             cap_long = wave_cap * 0.5
 
@@ -713,14 +712,17 @@ Mendoje si një **SL që ngjitet lart** sa herë që çmimi ecën në drejtimin 
         if auto_cap > 0:
             initial_risk_usdt = auto_cap * risk_pct / 100
 
-            # deri sa çmimi të kalojë trigger-in, SL nuk lëviz
             if move_up_now <= trail_trigger:
                 current_sl_dist = initial_sl_dist
             else:
                 extra_move = move_up_now - trail_trigger
                 current_sl_dist = max(0.0, initial_sl_dist - extra_move * (trail_step / 1.0))
 
-            current_max_loss_pct = min(risk_pct, risk_pct * current_sl_dist / initial_sl_dist) if initial_sl_dist > 0 else 0.0
+            if initial_sl_dist > 0:
+                current_max_loss_pct = min(risk_pct, risk_pct * current_sl_dist / initial_sl_dist)
+            else:
+                current_max_loss_pct = 0.0
+
             current_max_loss_usdt = auto_cap * current_max_loss_pct / 100
             locked_profit = max(0.0, initial_risk_usdt - current_max_loss_usdt)
 
@@ -817,7 +819,7 @@ Këtu mund të testosh skenarë të ndryshëm se si reagojnë BTC dhe PEPE.
             "🐸 Lëvizja e PEPE kur BTC bie (±%)",
             min_value=-100.0,
             max_value=100.0,
-            value=2.0,  # p.sh. PEPE rritet +2% kur BTC bie
+            value=2.0,
             step=0.1,
             key="bp_pepe_down"
         )
@@ -834,7 +836,7 @@ Këtu mund të testosh skenarë të ndryshëm se si reagojnë BTC dhe PEPE.
             "🐸 Lëvizja e PEPE kur BTC ngrihet (±%)",
             min_value=-100.0,
             max_value=100.0,
-            value=-1.0,  # p.sh. PEPE bie −1% kur BTC ngrihet
+            value=-1.0,
             step=0.1,
             key="bp_pepe_up"
         )
@@ -850,7 +852,6 @@ Këtu mund të testosh skenarë të ndryshëm se si reagojnë BTC dhe PEPE.
     )
 
     if bp_cap > 0:
-        # Shpërndarja
         cap_spot_pepe = bp_cap * bp_spot_pepe_pct / 100
         cap_fut_btc_margin = bp_cap * bp_fut_btc_pct / 100
         notional_btc_short = cap_fut_btc_margin * bp_lev_btc
@@ -859,8 +860,8 @@ Këtu mund të testosh skenarë të ndryshëm se si reagojnë BTC dhe PEPE.
         d_btc = btc_down_pct / 100.0
         d_pepe = pepe_react_down / 100.0
 
-        btc_profit_down = notional_btc_short * d_btc      # fitimi nga short
-        pepe_pnl_down = cap_spot_pepe * d_pepe            # ndryshimi në vlerën e PEPE
+        btc_profit_down = notional_btc_short * d_btc
+        pepe_pnl_down = cap_spot_pepe * d_pepe
 
         pnl_total_down = btc_profit_down + pepe_pnl_down
         cap_total_down = bp_cap + pnl_total_down
@@ -869,8 +870,8 @@ Këtu mund të testosh skenarë të ndryshëm se si reagojnë BTC dhe PEPE.
         u_btc = btc_up_pct / 100.0
         u_pepe = pepe_react_up / 100.0
 
-        btc_loss_up = notional_btc_short * u_btc * (-1)   # humbje nga short
-        pepe_pnl_up = cap_spot_pepe * u_pepe              # ndryshimi në PEPE
+        btc_loss_up = notional_btc_short * u_btc * (-1)
+        pepe_pnl_up = cap_spot_pepe * u_pepe
 
         pnl_total_up = btc_loss_up + pepe_pnl_up
         cap_total_up = bp_cap + pnl_total_up
@@ -919,7 +920,7 @@ Këtu mund të testosh skenarë të ndryshëm se si reagojnë BTC dhe PEPE.
 
             st.markdown(f"""
 - Coin fillestarë PEPE: **{coins_pepe_initial:,.2f}**  
-- Coin efektivë në skenarin BTC bie (nëse e llogarisim mbi vlerën e re): **{coins_pepe_down if coins_pepe_down is not None else coins_pepe_initial:,.2f}**  
+- Coin efektivë në skenarin BTC bie: **{coins_pepe_down if coins_pepe_down is not None else coins_pepe_initial:,.2f}**  
 - Coin efektivë në skenarin BTC ngrihet: **{coins_pepe_up if coins_pepe_up is not None else coins_pepe_initial:,.2f}**
 """)
 
