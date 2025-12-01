@@ -172,7 +172,7 @@ with tab_calc:
         tp_price = price_entry * (1 - tp_down_percent / 100)
         sl_price = price_entry * (1 + sl_up_percent / 100)
 
-        st.markdown("### 💲 Çmimet për Binance")
+        st.markdown("### 💲 Çmimet për Binance (sipas TP/SL që zgjodhe)")
 
         ct1, ct2 = st.columns(2)
 
@@ -183,6 +183,30 @@ with tab_calc:
         with ct2:
             st.markdown('<div class="elb-card">📈 Çmimi SL</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="metric-value">{sl_price:.12f}</div>', unsafe_allow_html=True)
+
+        # ====== NIVELLET STANDARD +1%...+6% & -2% ======
+        rows_levels = []
+        # plus 1% deri 6%
+        for i in range(1, 7):
+            price_plus = price_entry * (1 + i / 100.0)
+            rows_levels.append({
+                "Lëvizja": f"+{i}%",
+                "Çmimi": price_plus
+            })
+        # minus 2%
+        price_minus2 = price_entry * (1 - 2 / 100.0)
+        rows_levels.append({
+            "Lëvizja": "-2%",
+            "Çmimi": price_minus2
+        })
+
+        df_levels = pd.DataFrame(rows_levels)
+
+        st.markdown("### 📈 Nivellet standarde të çmimit (+1% … +6% dhe −2%)")
+        st.dataframe(df_levels, use_container_width=True)
+
+    else:
+        st.info("✋ Shkruaj një çmim hyrës > 0 që të llogariten të gjitha nivellet e çmimit.")
 
     st.markdown("---")
 
