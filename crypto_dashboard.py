@@ -5,7 +5,7 @@ import os  # për ruajtjen e logos në disk
 
 # ======================== KONFIGURIMI BAZË ========================
 st.set_page_config(
-    page_title="ElBuni Strategy PRO – TP & SL + Manual + GRID + Shields",
+    page_title="ElBuni Strategy PRO – TP & SL + Manual + GRID + Shields + BP",
     page_icon="💹",
     layout="wide"
 )
@@ -97,8 +97,14 @@ else:
 st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
 # ======================== TABS ========================
-tab_calc, tab_manual, tab_grid, tab_shields = st.tabs(
-    ["🧮 Kalkulatori", "📘 Manuali i Strategjisë", "🧱 ElBuni GRID", "🛡 ElBuni PRO Shields"]
+tab_calc, tab_manual, tab_grid, tab_shields, tab_bp = st.tabs(
+    [
+        "🧮 Kalkulatori",
+        "📘 Manuali i Strategjisë",
+        "🧱 ElBuni GRID",
+        "🛡 ElBuni PRO Shields",
+        "🧲 ElBuni BP (BTC + PEPE)"
+    ]
 )
 
 # ======================== TAB 1: KALKULATORI KRYESOR ========================
@@ -163,8 +169,8 @@ with tab_calc:
 
     # ======================== ÇMIMET TP & SL ========================
     if price_entry > 0:
-        tp_price = price_entry * (1 - tp_down_percent/100)
-        sl_price = price_entry * (1 + sl_up_percent/100)
+        tp_price = price_entry * (1 - tp_down_percent / 100)
+        sl_price = price_entry * (1 + sl_up_percent / 100)
 
         st.markdown("### 💲 Çmimet për Binance")
 
@@ -398,8 +404,8 @@ Strategji shumë e sigurt për luhatje të vogla:
         profits = []
 
         for i in range(grid_levels):
-            buy_price = entry_grid * (1 - (step_percent/100) * i)
-            tp_price = buy_price * (1 + tp_percent/100)
+            buy_price = entry_grid * (1 - (step_percent / 100) * i)
+            tp_price = buy_price * (1 + tp_percent / 100)
 
             buy_prices.append(buy_price)
             tp_prices.append(tp_price)
@@ -633,12 +639,12 @@ Ky kombinim ul shumë rrezikun e drejtimit të gabuar të tregut.
             with colW1:
                 st.metric("Fitim total/cikël (USDT)", f"{total_profit_cycle:,.2f}")
             with colW2:
-                st.metric("Fitim % mbi kapitalin", f"{(total_profit_cycle/wave_cap*100 if wave_cap>0 else 0):.2f}%")
+                st.metric("Fitim % mbi kapitalin", f"{(total_profit_cycle / wave_cap * 100 if wave_cap > 0 else 0):.2f}%")
 
             st.markdown("""
 **🧠 Si funksionon Wave Shield:**
 - Gjysma e kapitalit punon në valët poshtë (TP short të vegjël).  
-- Gjysma tjetë punon në valët lart (TP long të vegjël).  
+- Gjysma tjetër punon në valët lart (TP long të vegjël).  
 - Sa herë çmimi bën zig-zag, ti mbyll TP të vogla dhe mbledh fitime pa pasur nevojë të parashikosh bull/bear afatgjatë.
 """)
 
@@ -707,12 +713,11 @@ Mendoje si një **SL që ngjitet lart** sa herë që çmimi ecën në drejtimin 
         if auto_cap > 0:
             initial_risk_usdt = auto_cap * risk_pct / 100
 
-            # logjika: deri sa çmimi të kalojë trigger-in, SL nuk lëviz
+            # deri sa çmimi të kalojë trigger-in, SL nuk lëviz
             if move_up_now <= trail_trigger:
                 current_sl_dist = initial_sl_dist
             else:
                 extra_move = move_up_now - trail_trigger
-                # SL afrohet nga poshtë/lart (varet nga drejtimi) me trail_step për çdo 1% ekstra
                 current_sl_dist = max(0.0, initial_sl_dist - extra_move * (trail_step / 1.0))
 
             current_max_loss_pct = min(risk_pct, risk_pct * current_sl_dist / initial_sl_dist) if initial_sl_dist > 0 else 0.0
@@ -750,6 +755,185 @@ Mendoje si një **SL që ngjitet lart** sa herë që çmimi ecën në drejtimin 
 Kështu pozicioni yt nuk rri i hapur “pa kontrolle”, por ndiqet nga një SL inteligjent që mbron fitimin.
 """)
 
+# ======================== TAB 5: ELBUNI BP (BTC + PEPE) ========================
+with tab_bp:
+    st.markdown("## 🧲 ElBuni BP – BTC Short + PEPE Spot (Inverse Hedge)")
+
+    st.markdown("""
+**ElBuni BP** = kombinim **BTC SHORT (futures)** + **PEPE SPOT**.  
+Ideja:  
+- kur BTC bie → fiton nga short-i + PEPE mund të bjerë më pak ose të rritet  
+- kur BTC rritet → PEPE shpesh nuk ndjek 1:1 lëvizjen e BTC-së  
+
+Këtu mund të testosh skenarë të ndryshëm se si reagojnë BTC dhe PEPE.
+""")
+
+    st.markdown("---")
+
+    colA, colB, colC = st.columns(3)
+
+    with colA:
+        bp_cap = st.number_input(
+            "💰 Kapitali total për ElBuni BP (USDT)",
+            min_value=0.0,
+            value=5000.0,
+            step=100.0,
+            key="bp_cap"
+        )
+
+    with colB:
+        bp_spot_pepe_pct = st.slider(
+            "🐸 PEPE SPOT (%)",
+            0, 100, 60,
+            key="bp_spot_pepe_pct"
+        )
+
+    with colC:
+        bp_lev_btc = st.number_input(
+            "⚙️ Leverage BTC SHORT (x)",
+            min_value=1.0,
+            max_value=10.0,
+            value=2.0,
+            step=0.5,
+            key="bp_lev_btc"
+        )
+
+    bp_fut_btc_pct = 100 - bp_spot_pepe_pct
+    st.markdown(f"**₿ BTC SHORT futures (%) = {bp_fut_btc_pct}%**")
+
+    st.markdown("---")
+
+    colMv1, colMv2 = st.columns(2)
+    with colMv1:
+        btc_down_pct = st.number_input(
+            "📉 Rënia e BTC (−%) – skenari 1",
+            min_value=0.1,
+            max_value=80.0,
+            value=5.0,
+            step=0.1,
+            key="bp_btc_down"
+        )
+        pepe_react_down = st.number_input(
+            "🐸 Lëvizja e PEPE kur BTC bie (±%)",
+            min_value=-100.0,
+            max_value=100.0,
+            value=2.0,  # p.sh. PEPE rritet +2% kur BTC bie
+            step=0.1,
+            key="bp_pepe_down"
+        )
+    with colMv2:
+        btc_up_pct = st.number_input(
+            "📈 Ngritja e BTC (+%) – skenari 2",
+            min_value=0.1,
+            max_value=80.0,
+            value=5.0,
+            step=0.1,
+            key="bp_btc_up"
+        )
+        pepe_react_up = st.number_input(
+            "🐸 Lëvizja e PEPE kur BTC ngrihet (±%)",
+            min_value=-100.0,
+            max_value=100.0,
+            value=-1.0,  # p.sh. PEPE bie −1% kur BTC ngrihet
+            step=0.1,
+            key="bp_pepe_up"
+        )
+
+    st.markdown("---")
+
+    price_pepe_entry = st.number_input(
+        "💲 Çmimi hyrës i PEPE (opsionale, për coin-at)",
+        min_value=0.0,
+        value=0.00000457,
+        format="%.12f",
+        key="bp_pepe_entry"
+    )
+
+    if bp_cap > 0:
+        # Shpërndarja
+        cap_spot_pepe = bp_cap * bp_spot_pepe_pct / 100
+        cap_fut_btc_margin = bp_cap * bp_fut_btc_pct / 100
+        notional_btc_short = cap_fut_btc_margin * bp_lev_btc
+
+        # ===== Skenari 1: BTC bie =====
+        d_btc = btc_down_pct / 100.0
+        d_pepe = pepe_react_down / 100.0
+
+        btc_profit_down = notional_btc_short * d_btc      # fitimi nga short
+        pepe_pnl_down = cap_spot_pepe * d_pepe            # ndryshimi në vlerën e PEPE
+
+        pnl_total_down = btc_profit_down + pepe_pnl_down
+        cap_total_down = bp_cap + pnl_total_down
+
+        # ===== Skenari 2: BTC ngrihet =====
+        u_btc = btc_up_pct / 100.0
+        u_pepe = pepe_react_up / 100.0
+
+        btc_loss_up = notional_btc_short * u_btc * (-1)   # humbje nga short
+        pepe_pnl_up = cap_spot_pepe * u_pepe              # ndryshimi në PEPE
+
+        pnl_total_up = btc_loss_up + pepe_pnl_up
+        cap_total_up = bp_cap + pnl_total_up
+
+        # opcional: coin-a PEPE
+        coins_pepe_initial = coins_pepe_down = coins_pepe_up = None
+        if price_pepe_entry > 0:
+            coins_pepe_initial = cap_spot_pepe / price_pepe_entry
+
+            price_pepe_down = price_pepe_entry * (1 + d_pepe)
+            price_pepe_up = price_pepe_entry * (1 + u_pepe)
+            if price_pepe_down > 0:
+                coins_pepe_down = cap_spot_pepe * (1 + d_pepe) / price_pepe_down
+            if price_pepe_up > 0:
+                coins_pepe_up = cap_spot_pepe * (1 + u_pepe) / price_pepe_up
+
+        # ===== Tabela rezultatit =====
+        bp_df = pd.DataFrame([
+            {
+                "Skenari": "BTC bie",
+                "BTC lëvizja (%)": -btc_down_pct,
+                "PEPE lëvizja (%)": pepe_react_down,
+                "Kapital total (USDT)": cap_total_down,
+                "P&L total (USDT)": pnl_total_down
+            },
+            {
+                "Skenari": "BTC ngrihet",
+                "BTC lëvizja (%)": btc_up_pct,
+                "PEPE lëvizja (%)": pepe_react_up,
+                "Kapital total (USDT)": cap_total_up,
+                "P&L total (USDT)": pnl_total_up
+            }
+        ])
+
+        st.markdown("### 📊 Rezultatet ElBuni BP – BTC + PEPE")
+        st.dataframe(bp_df, use_container_width=True)
+
+        colBP1, colBP2 = st.columns(2)
+        with colBP1:
+            st.metric("P&L kur BTC bie", f"{pnl_total_down:,.2f} USDT")
+        with colBP2:
+            st.metric("P&L kur BTC ngrihet", f"{pnl_total_up:,.2f} USDT")
+
+        if coins_pepe_initial is not None:
+            st.markdown("### 🐸 PEPE – Coin-at në skenarë")
+
+            st.markdown(f"""
+- Coin fillestarë PEPE: **{coins_pepe_initial:,.2f}**  
+- Coin efektivë në skenarin BTC bie (nëse e llogarisim mbi vlerën e re): **{coins_pepe_down if coins_pepe_down is not None else coins_pepe_initial:,.2f}**  
+- Coin efektivë në skenarin BTC ngrihet: **{coins_pepe_up if coins_pepe_up is not None else coins_pepe_initial:,.2f}**
+""")
+
+        st.markdown("""
+**🧠 Interpretimi i ElBuni BP:**
+- Zgjedh një raport PEPE SPOT / BTC SHORT.  
+- Cakton sa lëviz BTC dhe sa pritet të reagojë PEPE kur BTC bie / ngrihet.  
+- Shikon menjëherë nëse kjo lidhje të jep **hedging të fortë** apo jo.  
+
+Kështu mund të gjesh konfigurimin ideal ku:
+- në rënie të BTC → fitimi nga short + reagimi i PEPE të japin P&L pozitiv  
+- në ngritje të BTC → nuk digjesh fort sepse PEPE nuk ndjek 1:1 lëvizjen e BTC-së.  
+""")
+
 # ===================== SQARIMI FINAL – PREMIUM POSHTË FAQES ========================
 st.markdown("<hr>", unsafe_allow_html=True)
 
@@ -778,8 +962,8 @@ st.markdown("""
     🔵 SL të rralla → humbje të vogla<br/>
     🔵 Kapital që rritet pa rrezik likuidimi<br/><br/>
 
-    Kjo e bën <b>ElBuni Strategy</b> + <b>ElBuni GRID</b> + <b>ElBuni PRO Shields</b>
-    një paketë të plotë profesionale për menaxhimin e riskut në kripto.
+    Me shtesën <b>ElBuni BP (BTC + PEPE)</b> ti ke edhe një modul special për hedging midis coinit kryesor (BTC) dhe një meme-coini si PEPE,
+    ku mund të shohësh direkt se si ndikojnë rëniet dhe ngritjet e BTC-së te portofoli yt i kombinuar.
   </div>
 </div>
 """, unsafe_allow_html=True)
