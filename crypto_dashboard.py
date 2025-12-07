@@ -10,6 +10,21 @@ st.set_page_config(
     layout="wide"
 )
 
+# ======================== ADMIN MODE (vetëm ti) ========================
+ADMIN_PIN = "3579"  # NDRROJE ME NJË PIN VETËM PËR TY
+
+with st.sidebar:
+    st.markdown("### 🔐 Admin Mode")
+    pin_input = st.text_input("Shkruaj PIN-in e adminit", type="password")
+    is_admin = (pin_input == ADMIN_PIN)
+
+    if is_admin:
+        st.success("✅ Admin mode i aktivizuar")
+    elif pin_input:
+        st.error("❌ PIN i pasaktë")
+    else:
+        st.info("Vetëm ti e ke PIN-in për admin.")
+
 # ======================== STILIMI ========================
 st.markdown("""
 <style>
@@ -95,6 +110,13 @@ else:
     st.markdown("### 💹 ElBuni Strategy PRO")
 
 st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+
+# ======================== LINKU I APLIKACIONIT – VETËM ADMIN ========================
+if is_admin:
+    st.markdown("### 🔗 Linku i aplikacionit (vetëm për ty)")
+    # NDRROJE ME LINKUN TËND REAL TË STREAMLIT KUR TA PUBLIKOSH
+    app_link = "https://elbuni-strategy.streamlit.app"
+    st.text_input("Kopjo linkun:", value=app_link)
 
 # ======================== TABS ========================
 tab_calc, tab_manual, tab_grid, tab_shields, tab_bp = st.tabs(
