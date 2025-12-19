@@ -19,6 +19,10 @@ XHUMAJA_ORA = "__:__"        # p.sh. "12:30"
 if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
 
+# faqja e fundit (që të jetë e paracaktuar)
+if "page" not in st.session_state:
+    st.session_state.page = "🕌 Faqja e Xhamisë"
+
 # ======================== STIL ========================
 st.markdown("""
 <style>
@@ -57,12 +61,9 @@ def fmt_money(x, dp=2):
         return str(x)
 
 def risk_note(leverage, sl_pct):
-    # heuristikë e thjeshtë (jo financiare) për ndjeshmëri rreziku
-    # rreziku rritet me lev dhe me SL të ngushtë.
     lev = max(1.0, float(leverage))
     sl = max(0.1, float(sl_pct))
-    score = (lev * (100.0 / sl))  # sa më i madh, aq më agresiv
-    # normalizim në 0-100
+    score = (lev * (100.0 / sl))
     norm = clamp((math.log10(score + 1) / 3.0) * 100.0, 0, 100)
     if norm < 35:
         label = "LOW"
@@ -73,19 +74,13 @@ def risk_note(leverage, sl_pct):
     return norm, label
 
 def liquidation_approx_cross(entry, leverage, side="LONG", mm=0.005):
-    """
-    Afërsim i thjeshtë për çmimin e likuidimit (cross) për USDT-margined.
-    Nuk është identik me Binance/Bybit (varet nga maintenance margin, fees, mode).
-    """
     L = max(1.0, float(leverage))
     e = float(entry)
     if e <= 0:
         return None
     if side.upper() == "LONG":
-        # liq më poshtë
         return e * (1 - (1 / L) + mm)
     else:
-        # SHORT liq më lartë
         return e * (1 + (1 / L) - mm)
 
 def pos_size_from_risk(equity, risk_pct, entry, sl_price, side="LONG"):
@@ -97,15 +92,14 @@ def pos_size_from_risk(equity, risk_pct, entry, sl_price, side="LONG"):
         return None
     risk_amount = eq * rp
     if side.upper() == "LONG":
-        dist = max(0.0000001, e - sl)
+        dist = max(1e-9, e - sl)
     else:
-        dist = max(0.0000001, sl - e)
+        dist = max(1e-9, sl - e)
     qty = risk_amount / dist
     notional = qty * e
     return qty, notional, risk_amount
 
-def grid_levels(entry, lower, upper, n_levels):
-    e = float(entry)
+def grid_levels(lower, upper, n_levels):
     lo = float(lower)
     hi = float(upper)
     n = int(n_levels)
@@ -114,8 +108,7 @@ def grid_levels(entry, lower, upper, n_levels):
     if lo >= hi:
         return []
     step = (hi - lo) / (n - 1)
-    levels = [lo + i * step for i in range(n)]
-    return levels
+    return [lo + i * step for i in range(n)]
 
 # ======================== SIDEBAR ========================
 with st.sidebar:
@@ -128,16 +121,25 @@ with st.sidebar:
         if pin == ADMIN_PIN:
             st.session_state.is_admin = True
             st.success("✅ Admin aktiv")
+            # sapo hyn admin -> shko automatikisht te ElBuni
+            st.session_state.page = "💹 ElBuni Strategy (Private)"
         else:
             st.session_state.is_admin = False
             st.error("❌ PIN i gabuar")
+            st.session_state.page = "🕌 Faqja e Xhamisë"
 
     st.markdown("---")
 
     if st.session_state.is_admin:
-        page = st.radio("Menu", ["🕌 Faqja e Xhamisë", "💹 ElBuni Strategy (Private)"], index=0)
+        st.session_state.page = st.radio(
+            "Menu",
+            ["💹 ElBuni Strategy (Private)", "🕌 Faqja e Xhamisë"],
+            index=0
+        )
     else:
-        page = "🕌 Faqja e Xhamisë"
+        st.session_state.page = "🕌 Faqja e Xhamisë"
+
+page = st.session_state.page
 
 # ======================== PAGE: XHAMIA (PUBLIC) ========================
 if page == "🕌 Faqja e Xhamisë":
@@ -202,7 +204,7 @@ if page == "🕌 Faqja e Xhamisë":
 """, unsafe_allow_html=True)
 
 # ======================== PAGE: ELBUNI (PRIVATE) ========================
-elif page == "💹 ElBUni Strategy (Private)":
+elif page == "💹 ElBuni Strategy (Private)":
     if not st.session_state.is_admin:
         st.error("⛔ Kjo pjesë është vetëm për admin.")
         st.stop()
@@ -210,7 +212,7 @@ elif page == "💹 ElBUni Strategy (Private)":
     st.markdown("""
     <div class="hero">
       <h1 style="margin:0;">💹 ElBuni Strategy PRO</h1>
-      <div class="small">Private • Kalkulatorë: Manual • TP/SL • GRID • Shields • BP • Journal</div>
+      <div class="small">Private • Manual • TP/SL • GRID • Shields • BP • Journal</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -223,17 +225,16 @@ elif page == "💹 ElBUni Strategy (Private)":
         st.subheader("📌 Manual – Setup i shpejtë")
         st.markdown("""
 **Rregulla bazë (praktike):**
-- Mos e rreziko krejt kapitalin: përdor **Risk %** (p.sh. 0.5% – 2%).
-- Vendos **SL real** (jo shumë afër pa arsye).
-- Leverage rrit rrezikun. Sa më i lartë lev, aq më i ndjeshëm është pozicioni.
-- Mbaj shënime në Journal (hyrje/arsye/rezultat) që të përmirësohesh.
+- Përdor **Risk %** (p.sh. 0.5% – 2%).
+- Vendos **SL** para se ta hapësh pozicionin.
+- Leverage rrit rrezikun → mos e përdor kot.
+- Mbaj shënime në Journal që të përmirësohesh.
 """)
-
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.markdown('<div class="kpi"><b>Rekomandim Risk</b><br/>0.5% – 2% për trade</div>', unsafe_allow_html=True)
+            st.markdown('<div class="kpi"><b>Rekomandim Risk</b><br/>0.5% – 2% / trade</div>', unsafe_allow_html=True)
         with c2:
-            st.markdown('<div class="kpi"><b>Rregull</b><br/>SL para se të hapësh pozicion</div>', unsafe_allow_html=True)
+            st.markdown('<div class="kpi"><b>Rregull</b><br/>SL para trade</div>', unsafe_allow_html=True)
         with c3:
             st.markdown('<div class="kpi"><b>Disiplinë</b><br/>Mos e zhvendos SL pa plan</div>', unsafe_allow_html=True)
 
@@ -247,16 +248,14 @@ elif page == "💹 ElBUni Strategy (Private)":
             entry = st.number_input("Entry Price", min_value=0.0, value=1.0000, step=0.0001, format="%.6f")
             equity = st.number_input("Kapitali (USDT)", min_value=0.0, value=1000.0, step=10.0)
             leverage = st.number_input("Leverage (x)", min_value=1.0, value=5.0, step=1.0)
-            risk_pct = st.number_input("Risk % (sa rrezikon nga kapitali)", min_value=0.1, value=1.0, step=0.1)
+            risk_pct = st.number_input("Risk % (nga kapitali)", min_value=0.1, value=1.0, step=0.1)
 
         with col2:
             sl_pct = st.number_input("SL % (nga Entry)", min_value=0.1, value=2.0, step=0.1)
             tp1_pct = st.number_input("TP1 %", min_value=0.1, value=2.0, step=0.1)
             tp2_pct = st.number_input("TP2 %", min_value=0.1, value=4.0, step=0.1)
             tp3_pct = st.number_input("TP3 %", min_value=0.1, value=6.0, step=0.1)
-            rr_target = st.number_input("Target R:R (info)", min_value=0.5, value=2.0, step=0.1)
 
-        # SL/TP prices
         if side == "LONG":
             sl_price = entry * (1 - sl_pct / 100.0)
             tp1 = entry * (1 + tp1_pct / 100.0)
@@ -269,19 +268,17 @@ elif page == "💹 ElBUni Strategy (Private)":
             tp3 = entry * (1 - tp3_pct / 100.0)
 
         liq = liquidation_approx_cross(entry, leverage, side=side, mm=0.005)
-
-        # position sizing by risk
         ps = pos_size_from_risk(equity, risk_pct, entry, sl_price, side=side)
-        st.markdown("---")
 
-        cA, cB, cC = st.columns(3)
-        with cA:
+        st.markdown("---")
+        a, b, c = st.columns(3)
+        with a:
             st.markdown(f'<div class="card"><b>SL Price</b><br/>{sl_price:.6f}</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="card"><b>TP1</b><br/>{tp1:.6f}</div>', unsafe_allow_html=True)
-        with cB:
+        with b:
             st.markdown(f'<div class="card"><b>TP2</b><br/>{tp2:.6f}</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="card"><b>TP3</b><br/>{tp3:.6f}</div>', unsafe_allow_html=True)
-        with cC:
+        with c:
             st.markdown(f'<div class="card"><b>Liq (Approx)</b><br/>{liq:.6f if liq else "—"}</div>', unsafe_allow_html=True)
 
         if ps:
@@ -293,25 +290,23 @@ elif page == "💹 ElBUni Strategy (Private)":
             st.write(f"- Notional: **{fmt_money(notional)} USDT**")
             st.write(f"- Ndjeshmëria e rrezikut: **{label}** ({sens:.0f}/100)")
         else:
-            st.info("Plotëso vlera valide për të llogaritur position size.")
+            st.info("Plotëso vlera valide për Position Size.")
 
-        st.caption("Shënim: Likuidimi është afërsim. Exchange-i mund të ketë mm/fees të ndryshme.")
+        st.caption("Shënim: Likuidimi është afërsim (varet nga exchange/fees/MM).")
 
     # ===================== TAB 3: GRID =====================
     with tabs[2]:
-        st.subheader("🧱 GRID – Gjenerues niveleve (Spot / Futures)")
+        st.subheader("🧱 GRID – Gjenerues niveleve")
 
         g1, g2 = st.columns(2)
         with g1:
-            g_entry = st.number_input("Entry/Reference", min_value=0.0, value=1.0000, step=0.0001, format="%.6f", key="g_entry")
-            g_lower = st.number_input("Lower Bound", min_value=0.0, value=0.9000, step=0.0001, format="%.6f", key="g_lower")
-            g_upper = st.number_input("Upper Bound", min_value=0.0, value=1.1000, step=0.0001, format="%.6f", key="g_upper")
+            g_lower = st.number_input("Lower Bound", min_value=0.0, value=0.9000, step=0.0001, format="%.6f")
+            g_upper = st.number_input("Upper Bound", min_value=0.0, value=1.1000, step=0.0001, format="%.6f")
         with g2:
             g_levels = st.number_input("Nr. Niveleve", min_value=2, value=11, step=1)
-            grid_mode = st.selectbox("Mode", ["Spot Grid", "Futures Grid (careful)"])
             per_level_usdt = st.number_input("USDT për nivel (opsional)", min_value=0.0, value=0.0, step=10.0)
 
-        levels = grid_levels(g_entry, g_lower, g_upper, g_levels)
+        levels = grid_levels(g_lower, g_upper, g_levels)
         if not levels:
             st.error("Lower duhet të jetë më i vogël se Upper.")
         else:
@@ -319,32 +314,26 @@ elif page == "💹 ElBUni Strategy (Private)":
             st.markdown(f"""
 <div class="card">
 <b>Hap (Step):</b> {step:.6f}<br/>
-<b>Nivele:</b> {len(levels)}<br/>
-<b>Mode:</b> {grid_mode}
+<b>Nivele:</b> {len(levels)}
 </div>
 """, unsafe_allow_html=True)
 
-            # show table
-            st.markdown("#### Nivelet")
-            rows = []
-            for i, lv in enumerate(levels, start=1):
-                dist_pct = (lv - g_entry) / g_entry * 100.0 if g_entry else 0.0
-                rows.append({"#": i, "Level": lv, "% nga Entry": dist_pct})
+            rows = [{"#": i+1, "Level": lv} for i, lv in enumerate(levels)]
             st.dataframe(rows, use_container_width=True)
 
             if per_level_usdt > 0:
                 total = per_level_usdt * len(levels)
-                st.success(f"Total alokim (afërsisht): {fmt_money(total)} USDT ( {fmt_money(per_level_usdt)} × {len(levels)} )")
+                st.success(f"Total alokim: {fmt_money(total)} USDT")
 
     # ===================== TAB 4: SHIELDS =====================
     with tabs[3]:
-        st.subheader("🛡️ Shields – Kontroll rreziku & rregulla")
+        st.subheader("🛡️ Shields – Kontroll rreziku")
 
         s1, s2 = st.columns(2)
         with s1:
             lev = st.number_input("Leverage (x)", min_value=1.0, value=5.0, step=1.0, key="s_lev")
             slp = st.number_input("SL %", min_value=0.1, value=2.0, step=0.1, key="s_slp")
-            daily_max_loss = st.number_input("Daily Max Loss % (stop për ditë)", min_value=0.5, value=3.0, step=0.5)
+            daily_max_loss = st.number_input("Daily Max Loss %", min_value=0.5, value=3.0, step=0.5)
         with s2:
             trades_per_day = st.number_input("Max Trades/Day", min_value=1, value=5, step=1)
             cool_down = st.number_input("Cooldown (min) pas humbje", min_value=0, value=30, step=5)
@@ -355,21 +344,19 @@ elif page == "💹 ElBUni Strategy (Private)":
         suggested_risk = clamp((1.5 - (sens/100)*1.2) * adj, 0.25, 1.5)
 
         st.markdown("---")
-        st.markdown("#### Shield Score")
         st.markdown(f"""
 <div class="card">
 <b>Ndjeshmëria:</b> {label} ({sens:.0f}/100)<br/>
-<b>Risk i sugjeruar / trade (heuristikë):</b> {suggested_risk:.2f}%<br/>
+<b>Risk i sugjeruar / trade:</b> {suggested_risk:.2f}%<br/>
 <b>Daily Stop:</b> {daily_max_loss:.1f}% • <b>Max Trades:</b> {int(trades_per_day)} • <b>Cooldown:</b> {int(cool_down)} min
 </div>
 """, unsafe_allow_html=True)
 
         st.markdown("#### Rregulla të shpejta")
         st.markdown("""
-- Nëse humb 2 herë rresht → ul riskun / ndalo për cooldown.
-- Nëse je në **News Mode** → ul lev ose risk.
+- 2 humbje rresht → ndalo, cooldown.
+- News Mode → ul lev / risk.
 - Mos e hap trade-in pa SL.
-- Nëse emocionohesh → pauzë 15–30 minuta.
 """)
 
     # ===================== TAB 5: BP (HEDGE) =====================
@@ -383,15 +370,12 @@ elif page == "💹 ElBUni Strategy (Private)":
             split_fut = 100 - split_spot
             st.write(f"Futures %: **{split_fut}%**")
         with b2:
-            direction_bias = st.selectbox("Bias", ["Neutral", "Long Bias", "Short Bias"])
             fut_lev = st.number_input("Futures Leverage", min_value=1.0, value=3.0, step=1.0)
-            hedge_ratio = st.slider("Hedge Ratio (sa % e Futures mbron Spot)", 0, 200, 100)
+            hedge_ratio = st.slider("Hedge Ratio (sa % mbron Spot)", 0, 200, 100)
 
         spot_usdt = total_usdt * split_spot / 100.0
         fut_margin = total_usdt * split_fut / 100.0
         fut_notional = fut_margin * fut_lev
-
-        # hedge notional suggestion (very simple)
         hedge_target = spot_usdt * (hedge_ratio / 100.0)
 
         st.markdown("---")
@@ -403,24 +387,18 @@ elif page == "💹 ElBUni Strategy (Private)":
         with c3:
             st.markdown(f'<div class="card"><b>Futures Notional</b><br/>{fmt_money(fut_notional)} USDT</div>', unsafe_allow_html=True)
 
-        st.markdown("#### Hedge Suggestion (model i thjeshtë)")
+        st.markdown("#### Hedge Suggestion")
         st.write(f"- Target Hedge Notional: **{fmt_money(hedge_target)} USDT**")
-        if fut_notional <= 0:
-            st.info("Rrit Futures % ose leverage për të krijuar notional.")
+        if fut_notional < hedge_target:
+            st.warning("Mbrojtja është më e vogël se target (sipas këtij modeli).")
         else:
-            coverage = (fut_notional / max(1e-9, spot_usdt)) * 100.0 if spot_usdt > 0 else 0.0
-            st.write(f"- Coverage vs Spot: **{coverage:.1f}%**")
-            if fut_notional < hedge_target:
-                st.warning("Futures notional është më i ulët se target hedge → mbrojtje më e vogël.")
-            else:
-                st.success("Futures notional arrin/kalon target hedge (sipas këtij modeli).")
+            st.success("Mbrojtja e arrin/kalon target (sipas këtij modeli).")
 
-        st.caption("Shënim: Ky është model i thjeshtë për ndarje/mbrojtje. Jo këshillë financiare.")
+        st.caption("Shënim: Model i thjeshtë. Jo këshillë financiare.")
 
     # ===================== TAB 6: JOURNAL =====================
     with tabs[5]:
         st.subheader("📝 Journal – Shënime trade")
-        st.write("Shkruaj disa shënime që t’i ruash lokalisht (download si CSV).")
 
         if "journal" not in st.session_state:
             st.session_state.journal = []
@@ -452,13 +430,12 @@ elif page == "💹 ElBUni Strategy (Private)":
         if st.session_state.journal:
             st.dataframe(st.session_state.journal, use_container_width=True)
 
-            # download CSV
             import pandas as pd
             df = pd.DataFrame(st.session_state.journal)
             csv = df.to_csv(index=False).encode("utf-8")
             st.download_button("⬇️ Shkarko CSV", data=csv, file_name="elbuni_journal.csv", mime="text/csv")
 
-            if st.button("🗑️ Fshij Journal (lokalisht)"):
+            if st.button("🗑️ Fshij Journal"):
                 st.session_state.journal = []
                 st.warning("Journal u fshi.")
         else:
