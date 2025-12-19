@@ -1,4 +1,6 @@
 import streamlit as st
+import math
+from datetime import datetime
 
 # ======================== CONFIG ========================
 st.set_page_config(
@@ -34,15 +36,93 @@ st.markdown("""
   background: rgba(255,255,255,0.04);
 }
 .small { opacity: .8; }
+.kpi {
+  border: 1px solid rgba(148,163,184,0.35);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.03);
+}
+hr { border: none; border-top: 1px solid rgba(148,163,184,0.25); margin: 12px 0; }
 </style>
 """, unsafe_allow_html=True)
+
+# ======================== HELPERS ========================
+def clamp(x, a, b):
+    return max(a, min(b, x))
+
+def fmt_money(x, dp=2):
+    try:
+        return f"{x:,.{dp}f}"
+    except Exception:
+        return str(x)
+
+def risk_note(leverage, sl_pct):
+    # heuristikë e thjeshtë (jo financiare) për ndjeshmëri rreziku
+    # rreziku rritet me lev dhe me SL të ngushtë.
+    lev = max(1.0, float(leverage))
+    sl = max(0.1, float(sl_pct))
+    score = (lev * (100.0 / sl))  # sa më i madh, aq më agresiv
+    # normalizim në 0-100
+    norm = clamp((math.log10(score + 1) / 3.0) * 100.0, 0, 100)
+    if norm < 35:
+        label = "LOW"
+    elif norm < 70:
+        label = "MEDIUM"
+    else:
+        label = "HIGH"
+    return norm, label
+
+def liquidation_approx_cross(entry, leverage, side="LONG", mm=0.005):
+    """
+    Afërsim i thjeshtë për çmimin e likuidimit (cross) për USDT-margined.
+    Nuk është identik me Binance/Bybit (varet nga maintenance margin, fees, mode).
+    """
+    L = max(1.0, float(leverage))
+    e = float(entry)
+    if e <= 0:
+        return None
+    if side.upper() == "LONG":
+        # liq më poshtë
+        return e * (1 - (1 / L) + mm)
+    else:
+        # SHORT liq më lartë
+        return e * (1 + (1 / L) - mm)
+
+def pos_size_from_risk(equity, risk_pct, entry, sl_price, side="LONG"):
+    eq = float(equity)
+    rp = float(risk_pct) / 100.0
+    e = float(entry)
+    sl = float(sl_price)
+    if eq <= 0 or rp <= 0 or e <= 0:
+        return None
+    risk_amount = eq * rp
+    if side.upper() == "LONG":
+        dist = max(0.0000001, e - sl)
+    else:
+        dist = max(0.0000001, sl - e)
+    qty = risk_amount / dist
+    notional = qty * e
+    return qty, notional, risk_amount
+
+def grid_levels(entry, lower, upper, n_levels):
+    e = float(entry)
+    lo = float(lower)
+    hi = float(upper)
+    n = int(n_levels)
+    if n < 2:
+        n = 2
+    if lo >= hi:
+        return []
+    step = (hi - lo) / (n - 1)
+    levels = [lo + i * step for i in range(n)]
+    return levels
 
 # ======================== SIDEBAR ========================
 with st.sidebar:
     st.markdown("### 🕌 Xhamia e Bardhë – Hotël")
 
     st.markdown("#### 🔐 Admin (vetëm ti)")
-    pin = st.text_input("Shkruaj PIN-in", type="password")
+    pin = st.text_input("Shkruaj PIN-in", type="password").strip()
 
     if pin:
         if pin == ADMIN_PIN:
@@ -122,11 +202,264 @@ if page == "🕌 Faqja e Xhamisë":
 """, unsafe_allow_html=True)
 
 # ======================== PAGE: ELBUNI (PRIVATE) ========================
-elif page == "💹 ElBuni Strategy (Private)":
+elif page == "💹 ElBUni Strategy (Private)":
     if not st.session_state.is_admin:
         st.error("⛔ Kjo pjesë është vetëm për admin.")
         st.stop()
 
-    st.title("💹 ElBuni Strategy (Private)")
-    st.caption("Kjo pjesë shfaqet vetëm kur futet PIN-i.")
-    st.info("👉 Këtu e ngjit kodin tënd të plotë të ElBuni (tabs/kalkulator/grid/shields/BP).")
+    st.markdown("""
+    <div class="hero">
+      <h1 style="margin:0;">💹 ElBuni Strategy PRO</h1>
+      <div class="small">Private • Kalkulatorë: Manual • TP/SL • GRID • Shields • BP • Journal</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.write("")
+
+    tabs = st.tabs(["📌 Manual", "🎯 TP & SL", "🧱 GRID", "🛡️ Shields", "🧮 BP (Hedge)", "📝 Journal"])
+
+    # ===================== TAB 1: MANUAL =====================
+    with tabs[0]:
+        st.subheader("📌 Manual – Setup i shpejtë")
+        st.markdown("""
+**Rregulla bazë (praktike):**
+- Mos e rreziko krejt kapitalin: përdor **Risk %** (p.sh. 0.5% – 2%).
+- Vendos **SL real** (jo shumë afër pa arsye).
+- Leverage rrit rrezikun. Sa më i lartë lev, aq më i ndjeshëm është pozicioni.
+- Mbaj shënime në Journal (hyrje/arsye/rezultat) që të përmirësohesh.
+""")
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown('<div class="kpi"><b>Rekomandim Risk</b><br/>0.5% – 2% për trade</div>', unsafe_allow_html=True)
+        with c2:
+            st.markdown('<div class="kpi"><b>Rregull</b><br/>SL para se të hapësh pozicion</div>', unsafe_allow_html=True)
+        with c3:
+            st.markdown('<div class="kpi"><b>Disiplinë</b><br/>Mos e zhvendos SL pa plan</div>', unsafe_allow_html=True)
+
+    # ===================== TAB 2: TP & SL =====================
+    with tabs[1]:
+        st.subheader("🎯 TP & SL – Kalkulator (Long / Short)")
+
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            side = st.selectbox("Drejtimi", ["LONG", "SHORT"])
+            entry = st.number_input("Entry Price", min_value=0.0, value=1.0000, step=0.0001, format="%.6f")
+            equity = st.number_input("Kapitali (USDT)", min_value=0.0, value=1000.0, step=10.0)
+            leverage = st.number_input("Leverage (x)", min_value=1.0, value=5.0, step=1.0)
+            risk_pct = st.number_input("Risk % (sa rrezikon nga kapitali)", min_value=0.1, value=1.0, step=0.1)
+
+        with col2:
+            sl_pct = st.number_input("SL % (nga Entry)", min_value=0.1, value=2.0, step=0.1)
+            tp1_pct = st.number_input("TP1 %", min_value=0.1, value=2.0, step=0.1)
+            tp2_pct = st.number_input("TP2 %", min_value=0.1, value=4.0, step=0.1)
+            tp3_pct = st.number_input("TP3 %", min_value=0.1, value=6.0, step=0.1)
+            rr_target = st.number_input("Target R:R (info)", min_value=0.5, value=2.0, step=0.1)
+
+        # SL/TP prices
+        if side == "LONG":
+            sl_price = entry * (1 - sl_pct / 100.0)
+            tp1 = entry * (1 + tp1_pct / 100.0)
+            tp2 = entry * (1 + tp2_pct / 100.0)
+            tp3 = entry * (1 + tp3_pct / 100.0)
+        else:
+            sl_price = entry * (1 + sl_pct / 100.0)
+            tp1 = entry * (1 - tp1_pct / 100.0)
+            tp2 = entry * (1 - tp2_pct / 100.0)
+            tp3 = entry * (1 - tp3_pct / 100.0)
+
+        liq = liquidation_approx_cross(entry, leverage, side=side, mm=0.005)
+
+        # position sizing by risk
+        ps = pos_size_from_risk(equity, risk_pct, entry, sl_price, side=side)
+        st.markdown("---")
+
+        cA, cB, cC = st.columns(3)
+        with cA:
+            st.markdown(f'<div class="card"><b>SL Price</b><br/>{sl_price:.6f}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="card"><b>TP1</b><br/>{tp1:.6f}</div>', unsafe_allow_html=True)
+        with cB:
+            st.markdown(f'<div class="card"><b>TP2</b><br/>{tp2:.6f}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="card"><b>TP3</b><br/>{tp3:.6f}</div>', unsafe_allow_html=True)
+        with cC:
+            st.markdown(f'<div class="card"><b>Liq (Approx)</b><br/>{liq:.6f if liq else "—"}</div>', unsafe_allow_html=True)
+
+        if ps:
+            qty, notional, risk_amount = ps
+            sens, label = risk_note(leverage, sl_pct)
+            st.markdown("#### 📌 Position Size (me Risk %)")
+            st.write(f"- Risk Amount: **{fmt_money(risk_amount)} USDT**")
+            st.write(f"- Qty (afërsisht): **{fmt_money(qty, 6)}**")
+            st.write(f"- Notional: **{fmt_money(notional)} USDT**")
+            st.write(f"- Ndjeshmëria e rrezikut: **{label}** ({sens:.0f}/100)")
+        else:
+            st.info("Plotëso vlera valide për të llogaritur position size.")
+
+        st.caption("Shënim: Likuidimi është afërsim. Exchange-i mund të ketë mm/fees të ndryshme.")
+
+    # ===================== TAB 3: GRID =====================
+    with tabs[2]:
+        st.subheader("🧱 GRID – Gjenerues niveleve (Spot / Futures)")
+
+        g1, g2 = st.columns(2)
+        with g1:
+            g_entry = st.number_input("Entry/Reference", min_value=0.0, value=1.0000, step=0.0001, format="%.6f", key="g_entry")
+            g_lower = st.number_input("Lower Bound", min_value=0.0, value=0.9000, step=0.0001, format="%.6f", key="g_lower")
+            g_upper = st.number_input("Upper Bound", min_value=0.0, value=1.1000, step=0.0001, format="%.6f", key="g_upper")
+        with g2:
+            g_levels = st.number_input("Nr. Niveleve", min_value=2, value=11, step=1)
+            grid_mode = st.selectbox("Mode", ["Spot Grid", "Futures Grid (careful)"])
+            per_level_usdt = st.number_input("USDT për nivel (opsional)", min_value=0.0, value=0.0, step=10.0)
+
+        levels = grid_levels(g_entry, g_lower, g_upper, g_levels)
+        if not levels:
+            st.error("Lower duhet të jetë më i vogël se Upper.")
+        else:
+            step = (g_upper - g_lower) / (max(2, int(g_levels)) - 1)
+            st.markdown(f"""
+<div class="card">
+<b>Hap (Step):</b> {step:.6f}<br/>
+<b>Nivele:</b> {len(levels)}<br/>
+<b>Mode:</b> {grid_mode}
+</div>
+""", unsafe_allow_html=True)
+
+            # show table
+            st.markdown("#### Nivelet")
+            rows = []
+            for i, lv in enumerate(levels, start=1):
+                dist_pct = (lv - g_entry) / g_entry * 100.0 if g_entry else 0.0
+                rows.append({"#": i, "Level": lv, "% nga Entry": dist_pct})
+            st.dataframe(rows, use_container_width=True)
+
+            if per_level_usdt > 0:
+                total = per_level_usdt * len(levels)
+                st.success(f"Total alokim (afërsisht): {fmt_money(total)} USDT ( {fmt_money(per_level_usdt)} × {len(levels)} )")
+
+    # ===================== TAB 4: SHIELDS =====================
+    with tabs[3]:
+        st.subheader("🛡️ Shields – Kontroll rreziku & rregulla")
+
+        s1, s2 = st.columns(2)
+        with s1:
+            lev = st.number_input("Leverage (x)", min_value=1.0, value=5.0, step=1.0, key="s_lev")
+            slp = st.number_input("SL %", min_value=0.1, value=2.0, step=0.1, key="s_slp")
+            daily_max_loss = st.number_input("Daily Max Loss % (stop për ditë)", min_value=0.5, value=3.0, step=0.5)
+        with s2:
+            trades_per_day = st.number_input("Max Trades/Day", min_value=1, value=5, step=1)
+            cool_down = st.number_input("Cooldown (min) pas humbje", min_value=0, value=30, step=5)
+            news_mode = st.checkbox("News Mode (ul rrezikun)", value=False)
+
+        sens, label = risk_note(lev, slp)
+        adj = 0.7 if news_mode else 1.0
+        suggested_risk = clamp((1.5 - (sens/100)*1.2) * adj, 0.25, 1.5)
+
+        st.markdown("---")
+        st.markdown("#### Shield Score")
+        st.markdown(f"""
+<div class="card">
+<b>Ndjeshmëria:</b> {label} ({sens:.0f}/100)<br/>
+<b>Risk i sugjeruar / trade (heuristikë):</b> {suggested_risk:.2f}%<br/>
+<b>Daily Stop:</b> {daily_max_loss:.1f}% • <b>Max Trades:</b> {int(trades_per_day)} • <b>Cooldown:</b> {int(cool_down)} min
+</div>
+""", unsafe_allow_html=True)
+
+        st.markdown("#### Rregulla të shpejta")
+        st.markdown("""
+- Nëse humb 2 herë rresht → ul riskun / ndalo për cooldown.
+- Nëse je në **News Mode** → ul lev ose risk.
+- Mos e hap trade-in pa SL.
+- Nëse emocionohesh → pauzë 15–30 minuta.
+""")
+
+    # ===================== TAB 5: BP (HEDGE) =====================
+    with tabs[4]:
+        st.subheader("🧮 BP (Hedge) – Split Spot/Futures (model i thjeshtë)")
+
+        b1, b2 = st.columns(2)
+        with b1:
+            total_usdt = st.number_input("Total kapital (USDT)", min_value=0.0, value=1000.0, step=50.0)
+            split_spot = st.slider("Spot %", min_value=0, max_value=100, value=70)
+            split_fut = 100 - split_spot
+            st.write(f"Futures %: **{split_fut}%**")
+        with b2:
+            direction_bias = st.selectbox("Bias", ["Neutral", "Long Bias", "Short Bias"])
+            fut_lev = st.number_input("Futures Leverage", min_value=1.0, value=3.0, step=1.0)
+            hedge_ratio = st.slider("Hedge Ratio (sa % e Futures mbron Spot)", 0, 200, 100)
+
+        spot_usdt = total_usdt * split_spot / 100.0
+        fut_margin = total_usdt * split_fut / 100.0
+        fut_notional = fut_margin * fut_lev
+
+        # hedge notional suggestion (very simple)
+        hedge_target = spot_usdt * (hedge_ratio / 100.0)
+
+        st.markdown("---")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown(f'<div class="card"><b>Spot</b><br/>{fmt_money(spot_usdt)} USDT</div>', unsafe_allow_html=True)
+        with c2:
+            st.markdown(f'<div class="card"><b>Futures Margin</b><br/>{fmt_money(fut_margin)} USDT</div>', unsafe_allow_html=True)
+        with c3:
+            st.markdown(f'<div class="card"><b>Futures Notional</b><br/>{fmt_money(fut_notional)} USDT</div>', unsafe_allow_html=True)
+
+        st.markdown("#### Hedge Suggestion (model i thjeshtë)")
+        st.write(f"- Target Hedge Notional: **{fmt_money(hedge_target)} USDT**")
+        if fut_notional <= 0:
+            st.info("Rrit Futures % ose leverage për të krijuar notional.")
+        else:
+            coverage = (fut_notional / max(1e-9, spot_usdt)) * 100.0 if spot_usdt > 0 else 0.0
+            st.write(f"- Coverage vs Spot: **{coverage:.1f}%**")
+            if fut_notional < hedge_target:
+                st.warning("Futures notional është më i ulët se target hedge → mbrojtje më e vogël.")
+            else:
+                st.success("Futures notional arrin/kalon target hedge (sipas këtij modeli).")
+
+        st.caption("Shënim: Ky është model i thjeshtë për ndarje/mbrojtje. Jo këshillë financiare.")
+
+    # ===================== TAB 6: JOURNAL =====================
+    with tabs[5]:
+        st.subheader("📝 Journal – Shënime trade")
+        st.write("Shkruaj disa shënime që t’i ruash lokalisht (download si CSV).")
+
+        if "journal" not in st.session_state:
+            st.session_state.journal = []
+
+        j1, j2, j3 = st.columns(3)
+        with j1:
+            j_pair = st.text_input("Pair", value="BTC/USDT")
+            j_side = st.selectbox("Side", ["LONG", "SHORT"])
+        with j2:
+            j_entry = st.number_input("Entry", min_value=0.0, value=0.0, step=0.1)
+            j_sl = st.number_input("SL", min_value=0.0, value=0.0, step=0.1)
+        with j3:
+            j_tp = st.number_input("TP", min_value=0.0, value=0.0, step=0.1)
+            j_note = st.text_input("Note", value="")
+
+        if st.button("➕ Shto në Journal"):
+            st.session_state.journal.append({
+                "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "pair": j_pair,
+                "side": j_side,
+                "entry": j_entry,
+                "sl": j_sl,
+                "tp": j_tp,
+                "note": j_note
+            })
+            st.success("U shtua!")
+
+        st.markdown("---")
+        if st.session_state.journal:
+            st.dataframe(st.session_state.journal, use_container_width=True)
+
+            # download CSV
+            import pandas as pd
+            df = pd.DataFrame(st.session_state.journal)
+            csv = df.to_csv(index=False).encode("utf-8")
+            st.download_button("⬇️ Shkarko CSV", data=csv, file_name="elbuni_journal.csv", mime="text/csv")
+
+            if st.button("🗑️ Fshij Journal (lokalisht)"):
+                st.session_state.journal = []
+                st.warning("Journal u fshi.")
+        else:
+            st.info("Journal është bosh.")
