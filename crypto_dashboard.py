@@ -166,53 +166,62 @@ with tabs[1]:
 
     col1, col2 = st.columns([1, 1])
     with col1:
-        side = st.selectbox("Drejtimi", ["LONG", "SHORT"])
-        entry = st.number_input("Entry Price", min_value=0.0, value=1.0000, step=0.0001, format="%.6f")
-        equity = st.number_input("Kapitali (USDT)", min_value=0.0, value=1000.0, step=10.0)
-        leverage = st.number_input("Leverage (x)", min_value=1.0, value=5.0, step=1.0)
-        risk_pct = st.number_input("Risk % (nga kapitali)", min_value=0.1, value=1.0, step=0.1)
+        side = st.selectbox("Drejtimi", ["LONG", "SHORT"], key="tp_side")
+        entry = st.number_input("Entry Price", min_value=0.0, value=1.0000, step=0.0001, format="%.6f", key="tp_entry")
+        equity = st.number_input("Kapitali (USDT)", min_value=0.0, value=1000.0, step=10.0, key="tp_equity")
+        leverage = st.number_input("Leverage (x)", min_value=1.0, value=5.0, step=1.0, key="tp_lev")
+        risk_pct = st.number_input("Risk % (nga kapitali)", min_value=0.1, value=1.0, step=0.1, key="tp_risk")
 
     with col2:
-        sl_pct = st.number_input("SL % (nga Entry)", min_value=0.1, value=2.0, step=0.1)
-        tp1_pct = st.number_input("TP1 %", min_value=0.1, value=2.0, step=0.1)
-        tp2_pct = st.number_input("TP2 %", min_value=0.1, value=4.0, step=0.1)
-        tp3_pct = st.number_input("TP3 %", min_value=0.1, value=6.0, step=0.1)
+        sl_pct = st.number_input("SL % (nga Entry)", min_value=0.1, value=2.0, step=0.1, key="tp_sl")
+        tp1_pct = st.number_input("TP1 %", min_value=0.1, value=2.0, step=0.1, key="tp_tp1")
+        tp2_pct = st.number_input("TP2 %", min_value=0.1, value=4.0, step=0.1, key="tp_tp2")
+        tp3_pct = st.number_input("TP3 %", min_value=0.1, value=6.0, step=0.1, key="tp_tp3")
 
-    if side == "LONG":
-        sl_price = entry * (1 - sl_pct / 100.0)
-        tp1 = entry * (1 + tp1_pct / 100.0)
-        tp2 = entry * (1 + tp2_pct / 100.0)
-        tp3 = entry * (1 + tp3_pct / 100.0)
-    else:
-        sl_price = entry * (1 + sl_pct / 100.0)
-        tp1 = entry * (1 - tp1_pct / 100.0)
-        tp2 = entry * (1 - tp2_pct / 100.0)
-        tp3 = entry * (1 - tp3_pct / 100.0)
+    try:
+        if side == "LONG":
+            sl_price = entry * (1 - sl_pct / 100.0)
+            tp1 = entry * (1 + tp1_pct / 100.0)
+            tp2 = entry * (1 + tp2_pct / 100.0)
+            tp3 = entry * (1 + tp3_pct / 100.0)
+        else:
+            sl_price = entry * (1 + sl_pct / 100.0)
+            tp1 = entry * (1 - tp1_pct / 100.0)
+            tp2 = entry * (1 - tp2_pct / 100.0)
+            tp3 = entry * (1 - tp3_pct / 100.0)
 
-    liq = liquidation_approx_cross(entry, leverage, side=side, mm=0.005)
-    ps = pos_size_from_risk(equity, risk_pct, entry, sl_price, side=side)
+        liq = liquidation_approx_cross(entry, leverage, side=side, mm=0.005)
+        ps = pos_size_from_risk(equity, risk_pct, entry, sl_price, side=side)
 
-    st.markdown("---")
-    a, b, c = st.columns(3)
-    with a:
-        st.markdown(f'<div class="card"><b>SL Price</b><br/>{sl_price:.6f}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="card"><b>TP1</b><br/>{tp1:.6f}</div>', unsafe_allow_html=True)
-    with b:
-        st.markdown(f'<div class="card"><b>TP2</b><br/>{tp2:.6f}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="card"><b>TP3</b><br/>{tp3:.6f}</div>', unsafe_allow_html=True)
-    with c:
-        st.markdown(f'<div class="card"><b>Liq (Approx)</b><br/>{liq:.6f if liq else "—"}</div>', unsafe_allow_html=True)
+        st.markdown("---")
+        a, b, c = st.columns(3)
+        with a:
+            st.markdown(f'<div class="card"><b>SL Price</b><br/>{sl_price:.6f}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="card"><b>TP1</b><br/>{tp1:.6f}</div>', unsafe_allow_html=True)
+        with b:
+            st.markdown(f'<div class="card"><b>TP2</b><br/>{tp2:.6f}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="card"><b>TP3</b><br/>{tp3:.6f}</div>', unsafe_allow_html=True)
+        with c:
+            # KORRIGJIMI KËTU - kontrollojmë nëse liq është None
+            if liq is not None:
+                liq_display = f"{liq:.6f}"
+            else:
+                liq_display = "—"
+            st.markdown(f'<div class="card"><b>Liq (Approx)</b><br/>{liq_display}</div>', unsafe_allow_html=True)
 
-    if ps:
-        qty, notional, risk_amount = ps
-        sens, label = risk_note(leverage, sl_pct)
-        st.markdown("#### 📌 Position Size (me Risk %)")
-        st.write(f"- Risk Amount: **{fmt_money(risk_amount)} USDT**")
-        st.write(f"- Qty (afërsisht): **{fmt_money(qty, 6)}**")
-        st.write(f"- Notional: **{fmt_money(notional)} USDT**")
-        st.write(f"- Ndjeshmëria e rrezikut: **{label}** ({sens:.0f}/100)")
-    else:
-        st.info("Plotëso vlera valide për Position Size.")
+        if ps:
+            qty, notional, risk_amount = ps
+            sens, label = risk_note(leverage, sl_pct)
+            st.markdown("#### 📌 Position Size (me Risk %)")
+            st.write(f"- Risk Amount: **{fmt_money(risk_amount)} USDT**")
+            st.write(f"- Qty (afërsisht): **{fmt_money(qty, 6)}**")
+            st.write(f"- Notional: **{fmt_money(notional)} USDT**")
+            st.write(f"- Ndjeshmëria e rrezikut: **{label}** ({sens:.0f}/100)")
+        else:
+            st.info("Plotëso vlera valide për Position Size.")
+            
+    except Exception as e:
+        st.error(f"Gabim në llogaritje: {str(e)}")
 
     st.caption("Shënim: Likuidimi është afërsim (varet nga exchange/fees/MM).")
 
@@ -222,11 +231,11 @@ with tabs[2]:
 
     g1, g2 = st.columns(2)
     with g1:
-        g_lower = st.number_input("Lower Bound", min_value=0.0, value=0.9000, step=0.0001, format="%.6f")
-        g_upper = st.number_input("Upper Bound", min_value=0.0, value=1.1000, step=0.0001, format="%.6f")
+        g_lower = st.number_input("Lower Bound", min_value=0.0, value=0.9000, step=0.0001, format="%.6f", key="grid_lower")
+        g_upper = st.number_input("Upper Bound", min_value=0.0, value=1.1000, step=0.0001, format="%.6f", key="grid_upper")
     with g2:
-        g_levels = st.number_input("Nr. Niveleve", min_value=2, value=11, step=1)
-        per_level_usdt = st.number_input("USDT për nivel (opsional)", min_value=0.0, value=0.0, step=10.0)
+        g_levels = st.number_input("Nr. Niveleve", min_value=2, value=11, step=1, key="grid_levels")
+        per_level_usdt = st.number_input("USDT për nivel (opsional)", min_value=0.0, value=0.0, step=10.0, key="grid_usdt")
 
     levels = grid_levels(g_lower, g_upper, g_levels)
     if not levels:
@@ -253,13 +262,13 @@ with tabs[3]:
 
     s1, s2 = st.columns(2)
     with s1:
-        lev = st.number_input("Leverage (x)", min_value=1.0, value=5.0, step=1.0, key="s_lev")
-        slp = st.number_input("SL %", min_value=0.1, value=2.0, step=0.1, key="s_slp")
-        daily_max_loss = st.number_input("Daily Max Loss %", min_value=0.5, value=3.0, step=0.5)
+        lev = st.number_input("Leverage (x)", min_value=1.0, value=5.0, step=1.0, key="shield_lev")
+        slp = st.number_input("SL %", min_value=0.1, value=2.0, step=0.1, key="shield_sl")
+        daily_max_loss = st.number_input("Daily Max Loss %", min_value=0.5, value=3.0, step=0.5, key="shield_daily")
     with s2:
-        trades_per_day = st.number_input("Max Trades/Day", min_value=1, value=5, step=1)
-        cool_down = st.number_input("Cooldown (min) pas humbje", min_value=0, value=30, step=5)
-        news_mode = st.checkbox("News Mode (ul rrezikun)", value=False)
+        trades_per_day = st.number_input("Max Trades/Day", min_value=1, value=5, step=1, key="shield_trades")
+        cool_down = st.number_input("Cooldown (min) pas humbje", min_value=0, value=30, step=5, key="shield_cool")
+        news_mode = st.checkbox("News Mode (ul rrezikun)", value=False, key="shield_news")
 
     sens, label = risk_note(lev, slp)
     adj = 0.7 if news_mode else 1.0
@@ -287,13 +296,13 @@ with tabs[4]:
 
     b1, b2 = st.columns(2)
     with b1:
-        total_usdt = st.number_input("Total kapital (USDT)", min_value=0.0, value=1000.0, step=50.0)
-        split_spot = st.slider("Spot %", min_value=0, max_value=100, value=70)
+        total_usdt = st.number_input("Total kapital (USDT)", min_value=0.0, value=1000.0, step=50.0, key="bp_total")
+        split_spot = st.slider("Spot %", min_value=0, max_value=100, value=70, key="bp_spot")
         split_fut = 100 - split_spot
         st.write(f"Futures %: **{split_fut}%**")
     with b2:
-        fut_lev = st.number_input("Futures Leverage", min_value=1.0, value=3.0, step=1.0)
-        hedge_ratio = st.slider("Hedge Ratio (sa % mbron Spot)", 0, 200, 100)
+        fut_lev = st.number_input("Futures Leverage", min_value=1.0, value=3.0, step=1.0, key="bp_lev")
+        hedge_ratio = st.slider("Hedge Ratio (sa % mbron Spot)", 0, 200, 100, key="bp_hedge")
 
     spot_usdt = total_usdt * split_spot / 100.0
     fut_margin = total_usdt * split_fut / 100.0
@@ -324,16 +333,16 @@ with tabs[5]:
 
     j1, j2, j3 = st.columns(3)
     with j1:
-        j_pair = st.text_input("Pair", value="BTC/USDT")
-        j_side = st.selectbox("Side", ["LONG", "SHORT"])
+        j_pair = st.text_input("Pair", value="BTC/USDT", key="journal_pair")
+        j_side = st.selectbox("Side", ["LONG", "SHORT"], key="journal_side")
     with j2:
-        j_entry = st.number_input("Entry", min_value=0.0, value=0.0, step=0.1)
-        j_sl = st.number_input("SL", min_value=0.0, value=0.0, step=0.1)
+        j_entry = st.number_input("Entry", min_value=0.0, value=0.0, step=0.1, key="journal_entry")
+        j_sl = st.number_input("SL", min_value=0.0, value=0.0, step=0.1, key="journal_sl")
     with j3:
-        j_tp = st.number_input("TP", min_value=0.0, value=0.0, step=0.1)
-        j_note = st.text_input("Note", value="")
+        j_tp = st.number_input("TP", min_value=0.0, value=0.0, step=0.1, key="journal_tp")
+        j_note = st.text_input("Note", value="", key="journal_note")
 
-    if st.button("➕ Shto në Journal"):
+    if st.button("➕ Shto në Journal", key="journal_add"):
         st.session_state.journal.append({
             "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "pair": j_pair,
@@ -354,9 +363,10 @@ with tabs[5]:
         csv = df.to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Shkarko CSV", data=csv, file_name="elbuni_journal.csv", mime="text/csv")
 
-        if st.button("🗑️ Fshij Journal"):
+        if st.button("🗑️ Fshij Journal", key="journal_clear"):
             st.session_state.journal = []
             st.warning("Journal u fshi.")
+            st.rerun()
     else:
         st.info("Journal është bosh.")
 
